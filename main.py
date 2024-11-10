@@ -7,6 +7,10 @@ import wandb
 import sys
 import tempfile
 
+import certifi
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+
 
 import lightning as L
 from lightning.pytorch import Trainer, seed_everything
@@ -134,6 +138,11 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_name', type=str, default='CIFAR10', choices=['CIFAR10', 'ImageNet'], help='Dataset to use')
     parser.add_argument('--random_labels', type=bool, default=False, help='Whether to add random labels')
     parser.add_argument('--random_label_perc', type=float, default=0.1, help='Percentage of random labels to add')
+    parser.add_argument('--noisy_image', type=bool, default=False, help='Whether to add noisy images')
+    parser.add_argument('--noise_image_perc', type=float, default=0.1, help='Percentage of noisy images to add')
+    parser.add_argument('--model_checkpoint', type=bool, default=True, help='Whether to save model checkpoints')
+    parser.add_argument('--early_stopping', type=bool, default=True, help='Whether to use early stopping')
+
 
     # Model specific args
     parser.add_argument('--model_name', type=str, default='AlexNet', choices=['AlexNet', 'InceptionV3'], help='Model to use')

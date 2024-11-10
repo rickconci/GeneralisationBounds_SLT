@@ -8,11 +8,6 @@ import lightning as L
 from lightning import LightningModule
 
 
-
-
-
-
-
 class SparseDeepModel(LightningModule):
     def __init__(self, model_name, num_classes, lr, weight_decay):
         super(SparseDeepModel, self).__init__()

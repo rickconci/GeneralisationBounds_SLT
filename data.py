@@ -5,13 +5,11 @@ import torchvision
 import torchvision.transforms as transforms
 
 
-
-    
-
 class DataModule(L.LightningDataModule):
     def __init__(self, dataset_name, batch_size=32, random_labels=False, random_label_perc=0.1, noisy_image=False, noise_image_perc=0.1):
         super().__init__()
         self.batch_size = batch_size
+        self.dataset_name = dataset_name
 
         if dataset_name == 'CIFAR10':
             self.num_classes = 10
@@ -39,7 +37,7 @@ class DataModule(L.LightningDataModule):
             
             # Split the validation set into validation and test sets by 90% and 10% respectively    
             self.val = Subset(self.val_test, range(0, int(0.9 * len(self.val_test))))
-            self.test = Subset(self.val_test, range(int(0.9 * len(self.val_test)), len(self.cifar_val_test)))
+            self.test = Subset(self.val_test, range(int(0.9 * len(self.val_test)), len(self.val_test)))
         elif self.dataset_name == 'ImageNet':
             # Load ImageNet dataset
             self.train = torchvision.datasets.ImageNet(root='./data', split='train', transform=self.transform)
