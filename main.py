@@ -7,6 +7,7 @@ import wandb
 import sys
 import tempfile
 
+# i needed the next 3 lines to download the CIFAR10 dataset...
 import certifi
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
