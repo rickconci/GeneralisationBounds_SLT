@@ -7,11 +7,6 @@ import wandb
 import sys
 import tempfile
 
-# i needed the next 3 lines to download the CIFAR10 dataset...
-import certifi
-import ssl
-ssl._create_default_https_context = ssl._create_unverified_context
-
 
 import lightning as L
 from lightning.pytorch import Trainer, seed_everything
@@ -141,9 +136,6 @@ if __name__ == '__main__':
     parser.add_argument('--random_label_perc', type=float, default=0.1, help='Percentage of random labels to add')
     parser.add_argument('--noisy_image', type=bool, default=False, help='Whether to add noisy images')
     parser.add_argument('--noise_image_perc', type=float, default=0.1, help='Percentage of noisy images to add')
-    parser.add_argument('--model_checkpoint', type=bool, default=True, help='Whether to save model checkpoints')
-    parser.add_argument('--early_stopping', type=bool, default=True, help='Whether to use early stopping')
-
 
     # Model specific args
     parser.add_argument('--model_name', type=str, default='AlexNet', choices=['AlexNet', 'InceptionV3'], help='Model to use')
@@ -154,11 +146,13 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', type=float, default=0.0001, help='Weight decay')
     parser.add_argument('--max_epochs', type=int, default=200, help='Maximum number of epochs to train')
     
-    parser.add_argument('--accelerator', type=str, default='auto', choices=['gpu', 'mps', 'cpu', 'auto'], help='Which accelerator to use')
+    parser.add_argument('--accelerator', type=str, default='cpu', choices=['gpu', 'mps', 'cpu', 'auto'], help='Which accelerator to use')
 
-    parser.add_argument('--log_wandb', type=bool, default=False, help='Whether to log to wandb')
+    parser.add_argument('--log_wandb', type=bool, default=True, help='Whether to log to wandb')
     parser.add_argument('--project_name', type=str, default='SLT_project', help='Name of the wandb project')
     parser.add_argument('--seed', type=int, default=42, help='Seed for random number generators')
+    parser.add_argument('--model_checkpoint', type=bool, default=False, help='Enable model checkpointing')
+    parser.add_argument('--early_stopping', type=bool, default=False, help='Enable early stopping')
 
     args = parser.parse_args()
     main(args)

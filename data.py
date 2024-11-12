@@ -54,10 +54,10 @@ class DataModule(L.LightningDataModule):
     
     
     def train_dataloader(self):
-        return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, num_workers=4)
+        return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, num_workers=0, persistent_workers=False)
     
     def val_dataloader(self):
-        return DataLoader(self.val, batch_size=self.batch_size, shuffle=False, num_workers=4)
+        return DataLoader(self.val, batch_size=self.batch_size, shuffle=False, num_workers=0, persistent_workers=False)
     
     def test_dataloader(self):
-        return DataLoader(self.test, batch_size=self.batch_size, shuffle=False, num_workers=4)
+        return DataLoader(self.test, batch_size=self.batch_size, shuffle=False, num_workers=0, persistent_workers=False)

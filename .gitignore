@@ -1,0 +1,7 @@
+model_logs/
+lightning_logs/
+Tempdir/
+Wandbdir/
+STL_project_output
+__pycache__/
+data/
