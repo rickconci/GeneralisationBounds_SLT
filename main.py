@@ -18,6 +18,8 @@ from lightning.pytorch.profilers import SimpleProfiler, AdvancedProfiler
 from data import DataModule
 from models import SparseDeepModel
 
+wandb.login(key = '3c5767e934e3aa77255fc6333617b6e0a2aab69f')
+
 def set_seed(seed):
     seed_everything(seed, workers=True)
     random.seed(seed)
@@ -45,7 +47,8 @@ def main(args):
     set_seed(args.seed)
 
     if args.log_wandb:
-        wandb_logger = WandbLogger(project=args.project_name, 
+        wandb_logger = WandbLogger(project=args.project_name,
+                                   entity="SLT_poggio24",
                                    log_model=False, 
                                    save_dir = os.path.join(saving_dir, 'model_logs'))
         wandb_logger.log_hyperparams(args)
