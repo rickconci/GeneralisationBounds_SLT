@@ -18,6 +18,8 @@ from lightning.pytorch.profilers import SimpleProfiler, AdvancedProfiler
 from data import DataModule
 from models import SparseDeepModel
 
+wandb.login(key = '3c5767e934e3aa77255fc6333617b6e0a2aab69f')
+
 def set_seed(seed):
     seed_everything(seed, workers=True)
     random.seed(seed)
@@ -45,7 +47,8 @@ def main(args):
     set_seed(args.seed)
 
     if args.log_wandb:
-        wandb_logger = WandbLogger(project=args.project_name, 
+        wandb_logger = WandbLogger(project=args.project_name,
+                                   entity="SLT_poggio24",
                                    log_model=False, 
                                    save_dir = os.path.join(saving_dir, 'model_logs'))
         wandb_logger.log_hyperparams(args)
@@ -134,6 +137,8 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_name', type=str, default='CIFAR10', choices=['CIFAR10', 'ImageNet'], help='Dataset to use')
     parser.add_argument('--random_labels', type=bool, default=False, help='Whether to add random labels')
     parser.add_argument('--random_label_perc', type=float, default=0.1, help='Percentage of random labels to add')
+    parser.add_argument('--noisy_image', type=bool, default=False, help='Whether to add noisy images')
+    parser.add_argument('--noise_image_perc', type=float, default=0.1, help='Percentage of noisy images to add')
 
     # Model specific args
     parser.add_argument('--model_name', type=str, default='AlexNet', choices=['AlexNet', 'InceptionV3'], help='Model to use')
@@ -144,11 +149,13 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', type=float, default=0.0001, help='Weight decay')
     parser.add_argument('--max_epochs', type=int, default=200, help='Maximum number of epochs to train')
     
-    parser.add_argument('--accelerator', type=str, default='auto', choices=['gpu', 'mps', 'cpu', 'auto'], help='Which accelerator to use')
+    parser.add_argument('--accelerator', type=str, default='cpu', choices=['gpu', 'mps', 'cpu', 'auto'], help='Which accelerator to use')
 
-    parser.add_argument('--log_wandb', type=bool, default=False, help='Whether to log to wandb')
+    parser.add_argument('--log_wandb', type=bool, default=True, help='Whether to log to wandb')
     parser.add_argument('--project_name', type=str, default='SLT_project', help='Name of the wandb project')
     parser.add_argument('--seed', type=int, default=42, help='Seed for random number generators')
+    parser.add_argument('--model_checkpoint', type=bool, default=False, help='Enable model checkpointing')
+    parser.add_argument('--early_stopping', type=bool, default=False, help='Enable early stopping')
 
     args = parser.parse_args()
     main(args)
