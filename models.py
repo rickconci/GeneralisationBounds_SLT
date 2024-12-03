@@ -24,7 +24,7 @@ class SparseDeepModel(LightningModule):
             self.model.classifier[6] = nn.Linear(self.model.classifier[6].in_features, num_classes)
         
 
-        self.criterion = nn.CrossEntropyLoss()
+        self.criterion = nn.MSELoss()
         self.accuracy = Accuracy(task='multiclass', num_classes=num_classes)
 
 
