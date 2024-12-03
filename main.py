@@ -74,7 +74,9 @@ def main(args):
                              random_labels=args.random_labels, 
                              random_label_perc=args.random_label_perc, 
                              noisy_image = args.noisy_image,
-                             noise_image_perc = args.noise_image_perc)
+                             noise_image_perc = args.noise_image_perc, 
+                             train_subset_size = args.train_subset_size,
+                             val_subset_size = args.val_subset_size)
 
     #define model
     model = SparseDeepModel(model_name=args.model_name, 
@@ -89,7 +91,7 @@ def main(args):
 
     if args.model_checkpoint:
         checkpoint_callback = ModelCheckpoint(
-            monitor='val_total_loss',        # Ensure this is the exact name used in your logging
+            monitor='val_loss',        # Ensure this is the exact name used in your logging
             dirpath= os.path.join(saving_dir, 'model_checkpoints', unique_dir_name),  # Directory to save checkpoints
             filename=f'best-{{epoch:02d}}-{{val_loss:.2f}}-{unique_dir_name}',
             save_top_k=1,
@@ -102,7 +104,7 @@ def main(args):
     if args.early_stopping:
         early_stopping = EarlyStopping(
             min_delta=0.00,
-            monitor='val_total_loss',        # Ensure this is the exact name used in your logging
+            monitor='val_loss',        # Ensure this is the exact name used in your logging
             patience=100,                    # num epochs with a val loss not improving before it stops 
             mode='min',                     # Minimize the monitored value
             verbose=True
@@ -139,6 +141,9 @@ if __name__ == '__main__':
     parser.add_argument('--random_label_perc', type=float, default=0.1, help='Percentage of random labels to add')
     parser.add_argument('--noisy_image', type=bool, default=False, help='Whether to add noisy images')
     parser.add_argument('--noise_image_perc', type=float, default=0.1, help='Percentage of noisy images to add')
+
+    parser.add_argument('--train_subset_size', type=int, default=64, help='Size of the training subset to use')
+    parser.add_argument('--val_subset_size', type=int, default=64, help='Size of the validation subset to use')
 
     # Model specific args
     parser.add_argument('--model_name', type=str, default='AlexNet', choices=['AlexNet', 'InceptionV3'], help='Model to use')

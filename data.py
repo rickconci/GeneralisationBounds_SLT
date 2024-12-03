@@ -7,7 +7,7 @@ import numpy as np
 
 
 class DataModule(L.LightningDataModule):
-    def __init__(self, dataset_name, batch_size=32, random_labels=False, random_label_perc=0.1, noisy_image=False, noise_image_perc=0.1):
+    def __init__(self, dataset_name, batch_size=32, random_labels=False, random_label_perc=0.1, noisy_image=False, noise_image_perc=0.1, train_subset_size=64, val_subset_size=64):
         super().__init__()
         self.batch_size = batch_size
         self.dataset_name = dataset_name
@@ -29,8 +29,11 @@ class DataModule(L.LightningDataModule):
                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
             ])  
 
+        self.train_subset_size = train_subset_size
+        self.val_subset_size = val_subset_size
+
     
-    def setup(self, stage=None, train_subset_size=None, val_subset_size=None):
+    def setup(self, stage=None):
         if self.dataset_name == 'CIFAR10':
             # Load CIFAR-10 dataset
             self.train = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=self.transform)
@@ -41,13 +44,13 @@ class DataModule(L.LightningDataModule):
             self.test = Subset(self.val_test, range(int(0.9 * len(self.val_test)), len(self.val_test)))
 
             # Create a smaller subset of the training dataset if specified
-            if train_subset_size is not None:
-                indices = np.random.choice(len(self.train), train_subset_size, replace=False)  # Random subset
+            if self.train_subset_size is not None:
+                indices = np.random.choice(len(self.train), self.train_subset_size, replace=False)  # Random subset
                 self.train = Subset(self.train, indices) 
 
             # Create a smaller subset of the validation dataset if specified
-            if val_subset_size is not None:
-                val_indices = np.random.choice(len(self.val), val_subset_size, replace=False)  # Random subset
+            if self.val_subset_size is not None:
+                val_indices = np.random.choice(len(self.val), self.val_subset_size, replace=False)  # Random subset
                 self.val = Subset(self.val, val_indices)
 
         elif self.dataset_name == 'ImageNet':
