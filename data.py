@@ -3,6 +3,7 @@ from torch.utils.data import DataLoader, Subset
 import lightning as L
 import torchvision
 import torchvision.transforms as transforms
+import numpy as np
 
 
 class DataModule(L.LightningDataModule):
@@ -29,7 +30,7 @@ class DataModule(L.LightningDataModule):
             ])  
 
     
-    def setup(self, stage=None):
+    def setup(self, stage=None, train_subset_size=None, val_subset_size=None):
         if self.dataset_name == 'CIFAR10':
             # Load CIFAR-10 dataset
             self.train = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=self.transform)
@@ -38,6 +39,17 @@ class DataModule(L.LightningDataModule):
             # Split the validation set into validation and test sets by 90% and 10% respectively    
             self.val = Subset(self.val_test, range(0, int(0.9 * len(self.val_test))))
             self.test = Subset(self.val_test, range(int(0.9 * len(self.val_test)), len(self.val_test)))
+
+            # Create a smaller subset of the training dataset if specified
+            if train_subset_size is not None:
+                indices = np.random.choice(len(self.train), train_subset_size, replace=False)  # Random subset
+                self.train = Subset(self.train, indices) 
+
+            # Create a smaller subset of the validation dataset if specified
+            if val_subset_size is not None:
+                val_indices = np.random.choice(len(self.val), val_subset_size, replace=False)  # Random subset
+                self.val = Subset(self.val, val_indices)
+
         elif self.dataset_name == 'ImageNet':
             # Load ImageNet dataset
             self.train = torchvision.datasets.ImageNet(root='./data', split='train', transform=self.transform)

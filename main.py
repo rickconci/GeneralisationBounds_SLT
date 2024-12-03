@@ -115,7 +115,7 @@ def main(args):
         max_epochs=args.max_epochs,
         accelerator=args.accelerator,
         logger=wandb_logger,
-        log_every_n_steps=6,
+        log_every_n_steps=1,
         callbacks=callbacks,
         #fast_dev_run = True,
         #overfit_batches = 1

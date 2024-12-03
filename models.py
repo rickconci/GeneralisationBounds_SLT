@@ -6,6 +6,10 @@ import torchvision.models as models
 from torchmetrics import Accuracy
 import lightning as L
 from lightning import LightningModule
+import math
+import numpy as np
+
+from utils import max_pixel_sums, eval_rho, our_total_bound
 
 
 class SparseDeepModel(LightningModule):
@@ -41,6 +45,17 @@ class SparseDeepModel(LightningModule):
         # Log the training loss and accuracy
         self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
         self.log("train_acc", self.train_acc, on_step=True, on_epoch=True, prog_bar=True)
+
+        # Access the training dataloader
+        data_loader = self.trainer.datamodule.train_dataloader()
+        num_classes = self.hparams.num_classes
+        dataset_size = len(data_loader.dataset)
+        depth = len([layer for layer in self.model.modules() if isinstance(layer, (torch.nn.Conv2d, torch.nn.Linear))])
+
+        # Compute the generalization bound using the utility function
+        bound = our_total_bound(self, data_loader, num_classes, dataset_size, depth)
+        self.log("generalization_bound", bound, prog_bar=True)
+
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -63,10 +78,20 @@ class SparseDeepModel(LightningModule):
         # Log the test loss and accuracy
         self.log("test_loss", loss, on_epoch=True, prog_bar=True)
         self.log("test_acc", self.test_acc, on_epoch=True, prog_bar=True)
+
+        # Access the training dataloader
+        data_loader = self.trainer.datamodule.train_dataloader()
+        num_classes = self.hparams.num_classes
+        dataset_size = len(data_loader.dataset)
+        depth = len([layer for layer in self.model.modules() if isinstance(layer, (torch.nn.Conv2d, torch.nn.Linear))])
+
+        # Compute the generalization bound using the utility function
+        bound = our_total_bound(self, data_loader, num_classes, dataset_size, depth)
+        self.log("generalization_bound", bound, prog_bar=True)
+
         return loss
 
     def configure_optimizers(self):
         # Define Adam optimizer with weight decay
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
         return optimizer
-    
