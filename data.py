@@ -4,6 +4,7 @@ import lightning as L
 import torchvision
 import torchvision.transforms as transforms
 import numpy as np
+import ssl
 
 
 class DataModule(L.LightningDataModule):
@@ -11,6 +12,7 @@ class DataModule(L.LightningDataModule):
         super().__init__()
         self.batch_size = batch_size
         self.dataset_name = dataset_name
+        self.random_labels = random_labels
 
         if dataset_name == 'CIFAR10':
             self.num_classes = 10
@@ -34,7 +36,9 @@ class DataModule(L.LightningDataModule):
 
     
     def setup(self, stage=None):
-        if self.dataset_name == 'CIFAR10':
+        if self.dataset_name == 'CIFAR10':            
+            ssl._create_default_https_context = ssl._create_unverified_context
+
             # Load CIFAR-10 dataset
             self.train = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=self.transform)
             self.val_test = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=self.transform)
@@ -52,17 +56,55 @@ class DataModule(L.LightningDataModule):
             if self.val_subset_size is not None:
                 val_indices = np.random.choice(len(self.val), self.val_subset_size, replace=False)  # Random subset
                 self.val = Subset(self.val, val_indices)
+            
+            # Apply random labels if specified
+            if self.random_labels:
+                self.randomize_labels()
 
         elif self.dataset_name == 'ImageNet':
             # Load ImageNet dataset
+
+            ssl._create_default_https_context = ssl._create_unverified_context
             self.train = torchvision.datasets.ImageNet(root='./data', split='train', transform=self.transform)
             self.val_test = torchvision.datasets.ImageNet(root='./data', split='val', transform=self.transform)
             # Split the validation set into validation and test sets by 90% and 10% respectively    
             self.val = Subset(self.val_test, range(0, int(0.9 * len(self.val_test))))
             self.test = Subset(self.val_test, range(int(0.9 * len(self.val_test)), len(self.val_test)))
 
-    def random_labels(self, random_label_perc):
-        pass
+            if self.train_subset_size is not None:
+                indices = np.random.choice(len(self.train), self.train_subset_size, replace=False)  # Random subset
+                self.train = Subset(self.train, indices) 
+
+            # Create a smaller subset of the validation dataset if specified
+            if self.val_subset_size is not None:
+                val_indices = np.random.choice(len(self.val), self.val_subset_size, replace=False)  # Random subset
+                self.val = Subset(self.val, val_indices)
+
+            # Apply random labels if specified
+            if self.random_labels:
+                self.randomize_labels()
+
+    def randomize_labels(self):
+        """Randomize all labels in the training dataset."""
+        if isinstance(self.train, Subset):
+            # Access the underlying dataset and indices
+            dataset = self.train.dataset
+            indices = self.train.indices
+        else:
+            # If self.train is not a Subset, use it directly
+            dataset = self.train
+            indices = range(len(self.train))
+        
+        # Generate random labels for the subset
+        num_samples = len(indices)
+        random_labels = np.random.randint(0, self.num_classes, num_samples)
+        
+        # Overwrite the labels in the original dataset at the specified indices
+        for idx, new_label in zip(indices, random_labels):
+            dataset.targets[idx] = new_label
+
+    #def random_labels(self, random_label_perc):
+    #    pass
 
     def noisy_images(self, noise_image_perc):
         pass
