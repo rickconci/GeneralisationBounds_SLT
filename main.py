@@ -75,8 +75,8 @@ def main(args):
                              random_label_perc=args.random_label_perc, 
                              noisy_image = args.noisy_image,
                              noise_image_perc = args.noise_image_perc, 
-                             train_subset_size = args.train_subset_size,
-                             val_subset_size = args.val_subset_size)
+                             train_subset_fraction = args.train_subset_fraction,
+                             val_subset_fraction = args.val_subset_fraction)
 
     #define model
     model = SparseDeepModel(model_name=args.model_name, 
@@ -142,8 +142,8 @@ if __name__ == '__main__':
     parser.add_argument('--noisy_image', type=bool, default=False, help='Whether to add noisy images')
     parser.add_argument('--noise_image_perc', type=float, default=0.1, help='Percentage of noisy images to add')
 
-    parser.add_argument('--train_subset_size', type=int, default=0.1, help='Size of the training subset to use')
-    parser.add_argument('--val_subset_size', type=int, default=1, help='Size of the validation subset to use')
+    parser.add_argument('--train_subset_fraction', type=int, default=0.1, help='Size of the training subset to use')
+    parser.add_argument('--val_subset_fraction', type=int, default=1, help='Size of the validation subset to use')
 
     # Model specific args
     parser.add_argument('--model_name', type=str, default='AlexNet', choices=['AlexNet', 'InceptionV3'], help='Model to use')
@@ -156,7 +156,7 @@ if __name__ == '__main__':
     
     parser.add_argument('--accelerator', type=str, default='cpu', choices=['gpu', 'mps', 'cpu', 'auto'], help='Which accelerator to use')
 
-    parser.add_argument('--log_wandb', type=bool, default=True, help='Whether to log to wandb')
+    parser.add_argument('--log_wandb', type=bool, default=False, help='Whether to log to wandb')
     parser.add_argument('--project_name', type=str, default='SLT_project', help='Name of the wandb project')
     parser.add_argument('--seed', type=int, default=42, help='Seed for random number generators')
     parser.add_argument('--model_checkpoint', type=bool, default=False, help='Enable model checkpointing')
