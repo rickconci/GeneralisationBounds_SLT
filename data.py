@@ -8,7 +8,7 @@ import ssl
 
 
 class DataModule(L.LightningDataModule):
-    def __init__(self, dataset_name, batch_size=32, random_labels=False, random_label_perc=0.1, noisy_image=False, noise_image_perc=0.1, train_subset_size=64, val_subset_size=64):
+    def __init__(self, dataset_name, batch_size=32, random_labels=False, random_label_perc=0.1, noisy_image=False, noise_image_perc=0.1, train_subset_fraction=0.1, val_subset_fraction=0.1):
         super().__init__()
         self.batch_size = batch_size
         self.dataset_name = dataset_name
@@ -31,8 +31,8 @@ class DataModule(L.LightningDataModule):
                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
             ])  
 
-        self.train_subset_size = train_subset_size
-        self.val_subset_size = val_subset_size
+        self.train_subset_fraction = train_subset_fraction
+        self.val_subset_fraction = val_subset_fraction
 
     
     def setup(self, stage=None):
@@ -48,13 +48,13 @@ class DataModule(L.LightningDataModule):
             self.test = Subset(self.val_test, range(int(0.9 * len(self.val_test)), len(self.val_test)))
 
             # Create a smaller subset of the training dataset if specified
-            if self.train_subset_size is not None:
-                indices = np.random.choice(len(self.train), self.train_subset_size, replace=False)  # Random subset
+            if self.train_subset_fraction is not None:
+                indices = np.random.choice(len(self.train), int(self.train_subset_fraction * len(self.train)), replace=False)  # Random subset
                 self.train = Subset(self.train, indices) 
 
             # Create a smaller subset of the validation dataset if specified
-            if self.val_subset_size is not None:
-                val_indices = np.random.choice(len(self.val), self.val_subset_size, replace=False)  # Random subset
+            if self.val_subset_fraction is not None:
+                val_indices = np.random.choice(len(self.val), int(self.val_subset_fraction * len(self.val)), replace=False)  # Random subset
                 self.val = Subset(self.val, val_indices)
             
             # Apply random labels if specified
@@ -71,13 +71,13 @@ class DataModule(L.LightningDataModule):
             self.val = Subset(self.val_test, range(0, int(0.9 * len(self.val_test))))
             self.test = Subset(self.val_test, range(int(0.9 * len(self.val_test)), len(self.val_test)))
 
-            if self.train_subset_size is not None:
-                indices = np.random.choice(len(self.train), self.train_subset_size, replace=False)  # Random subset
+            if self.train_subset_fraction is not None:
+                indices = np.random.choice(len(self.train), int(self.train_subset_fraction * len(self.train)), replace=False)  # Random subset
                 self.train = Subset(self.train, indices) 
 
             # Create a smaller subset of the validation dataset if specified
-            if self.val_subset_size is not None:
-                val_indices = np.random.choice(len(self.val), self.val_subset_size, replace=False)  # Random subset
+            if self.val_subset_fraction is not None:
+                val_indices = np.random.choice(len(self.val), int(self.val_subset_fraction * len(self.val)), replace=False)  # Random subset
                 self.val = Subset(self.val, val_indices)
 
             # Apply random labels if specified

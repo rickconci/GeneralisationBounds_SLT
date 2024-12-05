@@ -142,8 +142,8 @@ if __name__ == '__main__':
     parser.add_argument('--noisy_image', type=bool, default=False, help='Whether to add noisy images')
     parser.add_argument('--noise_image_perc', type=float, default=0.1, help='Percentage of noisy images to add')
 
-    parser.add_argument('--train_subset_size', type=int, default=64, help='Size of the training subset to use')
-    parser.add_argument('--val_subset_size', type=int, default=64, help='Size of the validation subset to use')
+    parser.add_argument('--train_subset_size', type=int, default=0.1, help='Size of the training subset to use')
+    parser.add_argument('--val_subset_size', type=int, default=1, help='Size of the validation subset to use')
 
     # Model specific args
     parser.add_argument('--model_name', type=str, default='AlexNet', choices=['AlexNet', 'InceptionV3'], help='Model to use')
