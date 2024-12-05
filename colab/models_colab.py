@@ -4,12 +4,12 @@ import torchvision
 import torchvision.transforms as transforms
 import torchvision.models as models
 from torchmetrics import Accuracy
-import lightning as L
-from lightning import LightningModule
+import pytorch_lightning as L
+from pytorch_lightning import LightningModule
 import math
 import numpy as np
 
-from utils import max_pixel_sums, eval_rho, our_total_bound
+from utils_colab import max_pixel_sums, eval_rho, our_total_bound
 
 
 class SparseDeepModel(LightningModule):
@@ -25,7 +25,6 @@ class SparseDeepModel(LightningModule):
         
 
         self.criterion = nn.MSELoss() # changed loss function and got error!
-        self.criterion = nn.MSELoss()
         self.accuracy = Accuracy(task='multiclass', num_classes=num_classes)
 
 
