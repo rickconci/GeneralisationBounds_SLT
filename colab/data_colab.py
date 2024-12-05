@@ -4,7 +4,6 @@ import pytorch_lightning as L
 import torchvision
 import torchvision.transforms as transforms
 import numpy as np
-#import ssl
 
 
 class DataModule(L.LightningDataModule):
@@ -37,8 +36,6 @@ class DataModule(L.LightningDataModule):
     
     def setup(self, stage=None):
         if self.dataset_name == 'CIFAR10':            
-            #ssl._create_default_https_context = ssl._create_unverified_context
-
             # Load CIFAR-10 dataset
             self.train = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=self.transform)
             self.val_test = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=self.transform)
@@ -63,8 +60,6 @@ class DataModule(L.LightningDataModule):
 
         elif self.dataset_name == 'ImageNet':
             # Load ImageNet dataset
-
-            #ssl._create_default_https_context = ssl._create_unverified_context
             self.train = torchvision.datasets.ImageNet(root='./data', split='train', transform=self.transform)
             self.val_test = torchvision.datasets.ImageNet(root='./data', split='val', transform=self.transform)
             # Split the validation set into validation and test sets by 90% and 10% respectively    
