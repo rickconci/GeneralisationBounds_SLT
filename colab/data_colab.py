@@ -4,10 +4,11 @@ import pytorch_lightning as L
 import torchvision
 import torchvision.transforms as transforms
 import numpy as np
-
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 class DataModule(L.LightningDataModule):
-    def __init__(self, dataset_name, batch_size=32, random_labels=False, random_label_perc=0.1, noisy_image=False, noise_image_perc=0.1, train_subset_fraction=0.1, val_subset_fraction=0.1):
+    def __init__(self, dataset_name, batch_size=32, random_labels=False, random_label_perc=0.1, noisy_image=False, noise_image_perc=0.1, train_subset_fraction=0.1, val_subset_fraction=1.0):
         super().__init__()
         self.batch_size = batch_size
         self.dataset_name = dataset_name
