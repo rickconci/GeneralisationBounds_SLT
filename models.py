@@ -266,7 +266,7 @@ def simulate_model_dimensions(kernel_dict, max_pool_layer_dict, dropout_layer_di
         max(dropout_layer_dict.keys(), default=0)
     )
     
-    for layer_idx in range(1, num_layers + 1):
+    for layer_idx in range(num_layers + 1):
         print(f"Layer {layer_idx}:")
         
         # Convolutional Layer
