@@ -124,7 +124,7 @@ class ModularCNN(LightningModule):
         )
 
         # Build layers based on the dictionaries
-        for layer_idx in range(1, num_layers + 1):
+        for layer_idx in range(num_layers + 1):
             # Convolutional Layer
             if layer_idx in kernel_dict:
                 layer_params = kernel_dict[layer_idx]

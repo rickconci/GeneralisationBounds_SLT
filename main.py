@@ -169,17 +169,17 @@ if __name__ == '__main__':
 
 
     kernel_dict = {
-        1: {'kernel_size': 3, 'out_channels': 16, 'stride': 1, 'padding': 1},
-        2: {'kernel_size': 3, 'out_channels': 32, 'stride': 1, 'padding': 1},
-        3: {'kernel_size': 3, 'out_channels': 64, 'stride': 1, 'padding': 1},
+        0: {'kernel_size': 3, 'out_channels': 16, 'stride': 1, 'padding': 1},
+        1: {'kernel_size': 3, 'out_channels': 32, 'stride': 1, 'padding': 1},
+        2: {'kernel_size': 3, 'out_channels': 64, 'stride': 1, 'padding': 1},
     }
 
     max_pool_layer_dict = {
-        2: {'pool_size': 2, 'stride': 2}  # Moved to layer 2 and stride set to 2
+        1: {'pool_size': 2, 'stride': 2}  # Moved to layer 2 and stride set to 2
     }
 
     dropout_layer_dict = {
-        3: 0.5,  # Apply Dropout with p=0.5 after layer 3
+        2: 0.5,  # Apply Dropout with p=0.5 after layer 3
     }
 
     simulate_model_dimensions(kernel_dict, max_pool_layer_dict, dropout_layer_dict, input_dims=(28, 28, 3))
