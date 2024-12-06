@@ -1,15 +1,15 @@
 import torch
 import torch.nn as nn
 import torchvision
+from torch.nn.utils.parametrizations import weight_norm
 import torchvision.transforms as transforms
 import torchvision.models as models
-from torch.nn.utils import weight_norm
-
 from torchmetrics import Accuracy
 import lightning as L
 from lightning import LightningModule
 import math
 import numpy as np
+from torch.optim.lr_scheduler import LambdaLR
 
 from utils import max_pixel_sums, eval_rho, our_total_bound
 
@@ -101,8 +101,10 @@ class SparseDeepModel(LightningModule):
         optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
         return optimizer
 
+
+
 class ModularCNN(LightningModule):
-    def __init__(self, kernel_dict, max_pool_layer_dict, dropout_layer_dict, num_classes, lr, weight_decay):
+    def __init__(self, kernel_dict, max_pool_layer_dict, dropout_layer_dict, num_classes, lr, weight_decay, warmup_steps=50, max_steps=200):
         super(ModularCNN, self).__init__()
         # implement model with N number of Conv2d layers followed by potential maxpooling layers, relu activations, dropout layers, and one single final linear layer
         # input size is always 28x28
@@ -112,6 +114,8 @@ class ModularCNN(LightningModule):
 
         self.lr = lr
         self.weight_decay = weight_decay
+        self.warmup_steps = warmup_steps
+        self.max_steps = max_steps
         self.num_classes = num_classes
 
         # Assuming grayscale images; change to 3 if using RGB images
@@ -186,6 +190,8 @@ class ModularCNN(LightningModule):
 
     def training_step(self, batch, batch_idx):
         inputs, labels = batch
+        #print('is data on GPU??')
+        #print(inputs.device)
         labels_one_hot = torch.nn.functional.one_hot(labels, num_classes=self.hparams.num_classes).float()
         outputs = self(inputs)
         loss = self.criterion(outputs, labels_one_hot)
@@ -243,9 +249,26 @@ class ModularCNN(LightningModule):
         return loss
 
     def configure_optimizers(self):
-        # Define SGD optimizer with weight decay
-        optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
-        return optimizer
+        # Define the optimizer
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        
+        # Define the scheduler with cosine decay and warm-up
+        def lr_lambda(current_step):
+            if current_step < self.warmup_steps:
+                return current_step / self.warmup_steps
+            cosine_decay = 0.5 * (1 + math.cos(math.pi * (current_step - self.warmup_steps) / (self.max_steps - self.warmup_steps)))
+            return cosine_decay
+
+        scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
+        
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "interval": "step",  # Adjust every step
+                "frequency": 1       # Apply every step
+            }
+        }
     
 
 

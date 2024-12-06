@@ -35,6 +35,10 @@ def set_seed(seed):
 def main(args, kernel_dict, max_pool_layer_dict, dropout_layer_dict):
 
     print('CUDA GPUs present?', torch.cuda.is_available())
+    print(torch.cuda.current_device())  # Should print the device index
+    print(torch.cuda.get_device_name(0))  # Should print the GPU name
+    torch.set_float32_matmul_precision('medium')
+
 
     saving_dir = os.getcwd()
     os.environ['TMPDIR'] = os.path.join(os.getcwd(), 'Tempdir')
@@ -81,7 +85,10 @@ def main(args, kernel_dict, max_pool_layer_dict, dropout_layer_dict):
                            dropout_layer_dict=dropout_layer_dict, 
                            num_classes= data_module.num_classes, 
                            lr=args.lr, 
-                           weight_decay=args.weight_decay)
+                           weight_decay=args.weight_decay, 
+                           warmup_steps = args.max_epochs/5, 
+                           max_steps = args.max_epochs)
+        
     elif args.model_type == 'LegacyModels':
         model = SparseDeepModel(model_name=args.model_name, 
                                 num_classes= data_module.num_classes, 
@@ -115,19 +122,23 @@ def main(args, kernel_dict, max_pool_layer_dict, dropout_layer_dict):
         )
         callbacks.append(early_stopping)
 
+    #callbacks.append[DeviceStatsMonitor()]
 
 
     trainer = Trainer(
         max_epochs=args.max_epochs,
         accelerator=args.accelerator,
         logger=wandb_logger,
-        log_every_n_steps=1,
+        log_every_n_steps=20,
         callbacks=callbacks,
         #fast_dev_run = True,
         #overfit_batches = 1
         #deterministic=True,
-        #check_val_every_n_epoch=1,  
-        #profiler="simple"   #this helps to identify bottlenecks 
+        #check_val_every_n_epoch=1,
+        devices=1, 
+        #strategy="ddp",
+        accumulate_grad_batches=6,
+        profiler="simple"   #this helps to identify bottlenecks 
     )
     trainer.fit(model, data_module)
 
@@ -136,7 +147,7 @@ def main(args, kernel_dict, max_pool_layer_dict, dropout_layer_dict):
 
 
 if __name__ == '__main__':
-    sys.stdout = open('SLT_project_output.txt', 'w')
+    #sys.stdout = open('SLT_project_output.txt', 'w')
 
     parser = argparse.ArgumentParser(description="Train a model on CV dataset")
     # Experiment specific args 
@@ -152,14 +163,14 @@ if __name__ == '__main__':
     parser.add_argument('--model_name', type=str, default='AlexNet', choices=['AlexNet', 'InceptionV3'], help='Legacy model to use')
 
     # Trainer specific args
-    parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
-    parser.add_argument('--batch_size', type=int, default=32, help='Batch size')
+    parser.add_argument('--lr', type=float, default=0.01, help='Learning rate')
+    parser.add_argument('--batch_size', type=int, default=8192, help='Batch size')
     parser.add_argument('--weight_decay', type=float, default=0.0001, help='Weight decay')
-    parser.add_argument('--max_epochs', type=int, default=200, help='Maximum number of epochs to train')
+    parser.add_argument('--max_epochs', type=int, default=400, help='Maximum number of epochs to train')
     
-    parser.add_argument('--accelerator', type=str, default='cpu', choices=['gpu', 'mps', 'cpu', 'auto'], help='Which accelerator to use')
+    parser.add_argument('--accelerator', type=str, default='gpu', choices=['gpu', 'mps', 'cpu', 'auto'], help='Which accelerator to use')
 
-    parser.add_argument('--log_wandb', type=bool, default=False, help='Whether to log to wandb')
+    parser.add_argument('--log_wandb', type=bool, default=True, help='Whether to log to wandb')
     parser.add_argument('--project_name', type=str, default='SLT_project', help='Name of the wandb project')
     parser.add_argument('--seed', type=int, default=42, help='Seed for random number generators')
     parser.add_argument('--model_checkpoint', type=bool, default=False, help='Enable model checkpointing')
@@ -168,19 +179,32 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
 
+    #kernel_dict = {
+    #    0: {'kernel_size': 3, 'out_channels': 16, 'stride': 1, 'padding': 1},  # Initial layer
+    #    1: {'kernel_size': 3, 'out_channels': 32, 'stride': 2, 'padding': 1},  # Down-sampling via stride
+    #    2: {'kernel_size': 3, 'out_channels': 64, 'stride': 2, 'padding': 1},  # Further down-sampling
+    #    3: {'kernel_size': 3, 'out_channels': 128, 'stride': 1, 'padding': 1},  # Feature extraction
+    #    4: {'kernel_size': 3, 'out_channels': 256, 'stride': 1, 'padding': 1},  # Deeper layer
+    #}
+
     kernel_dict = {
-        0: {'kernel_size': 3, 'out_channels': 16, 'stride': 1, 'padding': 1},
-        1: {'kernel_size': 3, 'out_channels': 32, 'stride': 1, 'padding': 1},
-        2: {'kernel_size': 3, 'out_channels': 64, 'stride': 1, 'padding': 1},
+        0: {'kernel_size': 3, 'out_channels': 32, 'stride': 1, 'padding': 1},  # Increased channels
+        1: {'kernel_size': 3, 'out_channels': 64, 'stride': 2, 'padding': 1},  # Increased channels
+        2: {'kernel_size': 3, 'out_channels': 128, 'stride': 2, 'padding': 1},  # Increased channels
+        3: {'kernel_size': 3, 'out_channels': 256, 'stride': 1, 'padding': 1},  # Deeper layer
+        4: {'kernel_size': 3, 'out_channels': 512, 'stride': 1, 'padding': 1},  # Increased depth
     }
 
-    max_pool_layer_dict = {
-        1: {'pool_size': 2, 'stride': 2}  # Moved to layer 2 and stride set to 2
-    }
+    max_pool_layer_dict = {}
+    #max_pool_layer_dict = {
+    #    1: {'pool_size': 2, 'stride': 2}  # Moved to layer 2 and stride set to 2
+    #}
 
     dropout_layer_dict = {
-        2: 0.5,  # Apply Dropout with p=0.5 after layer 3
-    }
+        1: 0.3,  # After the first down-sampling layer (layer 1)
+        3: 0.5,  # After layer 3 (feature extraction)
+        4: 0.5,  # After layer 4 (deep feature extraction)
+    } 
 
     simulate_model_dimensions(kernel_dict, max_pool_layer_dict, dropout_layer_dict, input_dims=(28, 28, 3))
     

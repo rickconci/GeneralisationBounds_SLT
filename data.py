@@ -8,6 +8,13 @@ import numpy as np
 import ssl
 
 
+def per_image_whitening(x):
+    device = x.device  
+    mean = x.mean().to(device)
+    std = x.std().to(device)
+    return (x - x.mean()) / (x.std() + 1e-5)
+
+    
 class DataModule(L.LightningDataModule):
     def __init__(self, dataset_name, batch_size=32, random_label_fraction=None, noise_image_fraction=None, train_subset_fraction=0.1, val_subset_fraction=0.1):
         super().__init__()
@@ -18,6 +25,8 @@ class DataModule(L.LightningDataModule):
         
         self.noise_image_fraction = noise_image_fraction
         self.random_label_fraction = random_label_fraction
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
 
         if dataset_name == 'CIFAR10':
@@ -39,9 +48,11 @@ class DataModule(L.LightningDataModule):
 
     
     def setup(self, stage=None):
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
         if self.dataset_name == 'CIFAR10':            
             ssl._create_default_https_context = ssl._create_unverified_context
-
+    
             # Load CIFAR-10 dataset
             self.train = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=self.transform)
             self.val_test = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=self.transform)
@@ -49,12 +60,12 @@ class DataModule(L.LightningDataModule):
             # Split the validation set into validation and test sets by 90% and 10% respectively    
             self.val = Subset(self.val_test, range(0, int(0.9 * len(self.val_test))))
             self.test = Subset(self.val_test, range(int(0.9 * len(self.val_test)), len(self.val_test)))
-
+    
             # Create a smaller subset of the training dataset if specified
             if self.train_subset_fraction is not None:
                 indices = np.random.choice(len(self.train), int(self.train_subset_fraction * len(self.train)), replace=False)  # Random subset
                 self.train = Subset(self.train, indices) 
-
+    
             # Create a smaller subset of the validation dataset if specified
             if self.val_subset_fraction is not None:
                 val_indices = np.random.choice(len(self.val), int(self.val_subset_fraction * len(self.val)), replace=False)  # Random subset
@@ -63,9 +74,14 @@ class DataModule(L.LightningDataModule):
             # Apply random labels if specified
             if self.random_label_fraction is not None:
                 self.randomize_labels()
-
+    
             if self.noise_image_fraction is not None:
                 self.noisy_images()
+    
+            # Cache datasets on GPU
+            self.train = GpuCachedDataset(self.train, device)
+            self.val = GpuCachedDataset(self.val, device)
+            self.test = GpuCachedDataset(self.test, device)
 
         elif self.dataset_name == 'ImageNet':
             # Load ImageNet dataset
@@ -146,16 +162,31 @@ class DataModule(L.LightningDataModule):
     
     
     def train_dataloader(self):
-        return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, num_workers=0, persistent_workers=False)
+        return DataLoader(self.train, batch_size=self.batch_size, shuffle=True, num_workers=0, persistent_workers=False, pin_memory=False)
     
     def val_dataloader(self):
-        return DataLoader(self.val, batch_size=self.batch_size, shuffle=False, num_workers=0, persistent_workers=False)
+        return DataLoader(self.val, batch_size=self.batch_size, shuffle=False, num_workers=0, persistent_workers=False )
     
     def test_dataloader(self):
         return DataLoader(self.test, batch_size=self.batch_size, shuffle=False, num_workers=0, persistent_workers=False)
 
 
+class GpuCachedDataset(torch.utils.data.Dataset):
+    def __init__(self, dataset, device):
+        self.device = device
+        self.data = []
+        self.targets = []
+
+        # Load data into memory and move to GPU
+        for idx in range(len(dataset)):
+            img, target = dataset[idx]
+            self.data.append(img.to(device, non_blocking=True))
+            self.targets.append(torch.tensor(target, device=device))
+    
+    def __len__(self):
+        return len(self.data)
+    
+    def __getitem__(self, idx):
+        return self.data[idx], self.targets[idx]
 
 
-def per_image_whitening(x):
-    return (x - x.mean()) / (x.std() + 1e-5)

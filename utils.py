@@ -8,17 +8,24 @@ def max_pixel_sums(data_loader):
     """
     Compute the maximum pixel sum for squared images in the dataset.
     """
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    
     # Get image size from the first batch
     first_batch = next(iter(data_loader))
     images, _ = first_batch
     image_size = images[0].size()
 
     # Initialize a tensor to hold the pixel sums
-    pixel_sums = torch.zeros(image_size)
+    pixel_sums = torch.zeros(image_size, device=device)
 
     # Loop over all images in the dataset and accumulate pixel sums
     for images, _ in data_loader:
+        images = images.to(device)
         pixel_sums += torch.sum(torch.pow(images, 2), dim=0)
+    
+    #print(f"Pixel sums device: {pixel_sums.device}")
+    #print(f"Images device: {images.device}")
 
     # Return the max value of pixel sums
     return pixel_sums.max().item()
@@ -37,6 +44,7 @@ def our_total_bound(net, data_loader, num_classes, dataset_size, depth, delta=0.
     """
     Compute the generalization bound for the given model.
     """
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     rho = eval_rho(net)
     n = dataset_size
     k = num_classes
