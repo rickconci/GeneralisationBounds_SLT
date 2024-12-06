@@ -10,6 +10,8 @@ from lightning import LightningModule
 import math
 import numpy as np
 from torch.optim.lr_scheduler import LambdaLR
+import torch.nn.init as init
+
 
 from utils import max_pixel_sums, eval_rho, our_total_bound
 
@@ -183,6 +185,26 @@ class ModularCNN(LightningModule):
         self.criterion = nn.MSELoss() # changed loss function and got error!
         self.accuracy = Accuracy(task='multiclass', num_classes=num_classes)
         self.save_hyperparameters()
+
+        self.apply(self._init_weights)  # Apply weight initialization
+
+    def _init_weights(self, module):
+        """
+        Initialize the weights of the network.
+        - Conv2d and Linear layers: Kaiming initialization
+        - BatchNorm layers: set weight to 1 and bias to 0
+        """
+        if isinstance(module, nn.Conv2d):
+            init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
+            if module.bias is not None:
+                init.constant_(module.bias, 0)
+        elif isinstance(module, nn.Linear):
+            init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
+            if module.bias is not None:
+                init.constant_(module.bias, 0)
+        elif isinstance(module, nn.BatchNorm2d):
+            init.constant_(module.weight, 1)
+            init.constant_(module.bias, 0)
 
 
     def forward(self, x):

@@ -192,7 +192,7 @@ if __name__ == '__main__':
         1: {'kernel_size': 3, 'out_channels': 64, 'stride': 2, 'padding': 1},  # Increased channels
         2: {'kernel_size': 3, 'out_channels': 128, 'stride': 2, 'padding': 1},  # Increased channels
         3: {'kernel_size': 3, 'out_channels': 256, 'stride': 1, 'padding': 1},  # Deeper layer
-        4: {'kernel_size': 3, 'out_channels': 512, 'stride': 1, 'padding': 1},  # Increased depth
+        4: {'kernel_size': 3, 'out_channels': 256, 'stride': 1, 'padding': 1},  # Increased depth
     }
 
     max_pool_layer_dict = {}
@@ -201,9 +201,9 @@ if __name__ == '__main__':
     #}
 
     dropout_layer_dict = {
-        1: 0.3,  # After the first down-sampling layer (layer 1)
-        3: 0.5,  # After layer 3 (feature extraction)
-        4: 0.5,  # After layer 4 (deep feature extraction)
+        1: 0.2,  # After the first down-sampling layer (layer 1)
+        3: 0.3,  # After layer 3 (feature extraction)
+        4: 0.3  # After layer 4 (deep feature extraction)
     } 
 
     simulate_model_dimensions(kernel_dict, max_pool_layer_dict, dropout_layer_dict, input_dims=(28, 28, 3))
