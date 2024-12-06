@@ -16,7 +16,7 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.profilers import SimpleProfiler, AdvancedProfiler
 
 from data import DataModule
-from models import SparseDeepModel
+from models import SparseDeepModel, ModularCNN, simulate_model_dimensions
 
 wandb.login(key = '3c5767e934e3aa77255fc6333617b6e0a2aab69f')
 
@@ -32,7 +32,7 @@ def set_seed(seed):
     torch.backends.cudnn.benchmark = False
 
 
-def main(args):
+def main(args, kernel_dict, max_pool_layer_dict, dropout_layer_dict):
 
     print('CUDA GPUs present?', torch.cuda.is_available())
 
@@ -59,10 +59,8 @@ def main(args):
         f"sd={args.seed}",
         f"dataset={args.dataset_name}",
         f"model={args.model_name}",
-        f"random_labels={args.random_labels}",
-        f"random_label_perc={args.random_label_perc}",
-        f"noisy_image={args.noisy_image}",
-        f"noise_image_perc={args.noise_image_perc}"
+        f"random_label_fraction={args.random_label_fraction}",
+        f"noise_image_fraction={args.noise_image_fraction}"
     ]
     unique_dir_name = "_".join(filename_parts)
 
@@ -71,16 +69,22 @@ def main(args):
     #define dataset
     data_module = DataModule(dataset_name=args.dataset_name, 
                              batch_size=args.batch_size, 
-                             random_labels=args.random_labels, 
-                             random_label_perc=args.random_label_perc, 
-                             noisy_image = args.noisy_image,
-                             noise_image_perc = args.noise_image_perc, 
+                             random_label_fraction=args.random_label_fraction, 
+                             noise_image_fraction = args.noise_image_fraction, 
                              train_subset_fraction = args.train_subset_fraction,
                              val_subset_fraction = args.val_subset_fraction)
 
     #define model
-    model = SparseDeepModel(model_name=args.model_name, 
-                            num_classes= data_module.num_classes, 
+    if args.model_type == 'ModularCNN':
+        model = ModularCNN(kernel_dict=kernel_dict, 
+                           max_pool_layer_dict=max_pool_layer_dict, 
+                           dropout_layer_dict=dropout_layer_dict, 
+                           num_classes= data_module.num_classes, 
+                           lr=args.lr, 
+                           weight_decay=args.weight_decay)
+    elif args.model_type == 'LegacyModels':
+        model = SparseDeepModel(model_name=args.model_name, 
+                                num_classes= data_module.num_classes, 
                             lr=args.lr, 
                             weight_decay=args.weight_decay)
 
@@ -132,21 +136,20 @@ def main(args):
 
 
 if __name__ == '__main__':
-    sys.stdout = open('SLT_project_output', 'w')
+    sys.stdout = open('SLT_project_output.txt', 'w')
 
     parser = argparse.ArgumentParser(description="Train a model on CV dataset")
     # Experiment specific args 
     parser.add_argument('--dataset_name', type=str, default='CIFAR10', choices=['CIFAR10', 'ImageNet'], help='Dataset to use')
-    parser.add_argument('--random_labels', type=bool, default=False, help='Whether to add random labels')
-    parser.add_argument('--random_label_perc', type=float, default=0.1, help='Percentage of random labels to add')
-    parser.add_argument('--noisy_image', type=bool, default=False, help='Whether to add noisy images')
-    parser.add_argument('--noise_image_perc', type=float, default=0.1, help='Percentage of noisy images to add')
-
-    parser.add_argument('--train_subset_fraction', type=int, default=0.1, help='Size of the training subset to use')
-    parser.add_argument('--val_subset_fraction', type=int, default=1, help='Size of the validation subset to use')
+    parser.add_argument('--train_subset_fraction', type=float, default=1.0, help='Size of the training subset to use')
+    parser.add_argument('--val_subset_fraction', type=float, default=1.0, help='Size of the validation subset to use')
+    
+    parser.add_argument('--random_label_fraction', type=float, default=None, help='Fraction of labels to randomize in the training dataset. Must be between 0.0 (no random labels) and 1.0 (all labels randomized.)')
+    parser.add_argument('--noise_image_fraction', type=float, default=None, help='Fraction of noise to add to training data. Must be between 0.0 (no noise) and 1.0 (pure noise).')
 
     # Model specific args
-    parser.add_argument('--model_name', type=str, default='AlexNet', choices=['AlexNet', 'InceptionV3'], help='Model to use')
+    parser.add_argument('--model_type', type=str, default='ModularCNN', choices=['ModularCNN', 'LegacyModels'], help='Model type to use')
+    parser.add_argument('--model_name', type=str, default='AlexNet', choices=['AlexNet', 'InceptionV3'], help='Legacy model to use')
 
     # Trainer specific args
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
@@ -163,4 +166,23 @@ if __name__ == '__main__':
     parser.add_argument('--early_stopping', type=bool, default=False, help='Enable early stopping')
 
     args = parser.parse_args()
-    main(args)
+
+
+    kernel_dict = {
+        1: {'kernel_size': 3, 'out_channels': 16, 'stride': 1, 'padding': 1},
+        2: {'kernel_size': 3, 'out_channels': 32, 'stride': 1, 'padding': 1},
+        3: {'kernel_size': 3, 'out_channels': 64, 'stride': 1, 'padding': 1},
+    }
+
+    max_pool_layer_dict = {
+        2: {'pool_size': 2, 'stride': 2}  # Moved to layer 2 and stride set to 2
+    }
+
+    dropout_layer_dict = {
+        3: 0.5,  # Apply Dropout with p=0.5 after layer 3
+    }
+
+    simulate_model_dimensions(kernel_dict, max_pool_layer_dict, dropout_layer_dict, input_dims=(28, 28, 3))
+    
+    
+    main(args, kernel_dict, max_pool_layer_dict, dropout_layer_dict)

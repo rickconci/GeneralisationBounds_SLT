@@ -3,5 +3,6 @@ lightning_logs/
 Tempdir/
 Wandbdir/
 SLT_project_output
+*.txt
 __pycache__/
 data/
