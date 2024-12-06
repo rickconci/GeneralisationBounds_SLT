@@ -3,6 +3,8 @@ import torch.nn as nn
 import torchvision
 import torchvision.transforms as transforms
 import torchvision.models as models
+from torch.nn.utils import weight_norm
+
 from torchmetrics import Accuracy
 import lightning as L
 from lightning import LightningModule
@@ -141,6 +143,7 @@ class ModularCNN(LightningModule):
                     padding=padding
                 )
                 layers.append(conv_layer)
+                conv_layer = weight_norm(conv_layer)
                 layers.append(nn.ReLU(inplace=True))
 
                 # Update spatial dimensions
