@@ -121,7 +121,7 @@ class ModularCNN(LightningModule):
         self.num_classes = num_classes
 
         # Assuming grayscale images; change to 3 if using RGB images
-        in_channels = 3
+        in_channels = 1
         h, w = 28, 28  # Input image dimensions
 
         layers = []
@@ -295,7 +295,7 @@ class ModularCNN(LightningModule):
 
 
 
-def simulate_model_dimensions(kernel_dict, max_pool_layer_dict, dropout_layer_dict, input_dims):
+def simulate_model_dimensions(kernel_dict, max_pool_layer_dict, dropout_layer_dict, input_dims, dataset_name="MNIST"):
     """
     Simulates the dimensions of the data as it passes through the model layers.
     
@@ -304,8 +304,19 @@ def simulate_model_dimensions(kernel_dict, max_pool_layer_dict, dropout_layer_di
         max_pool_layer_dict (dict): Dictionary describing the max pooling layers.
         dropout_layer_dict (dict): Dictionary describing the dropout layers.
         input_dims (tuple): A tuple (height, width, channels) representing the input dimensions.
+        dataset_name (str): Name of the dataset (e.g., "MNIST", "CIFAR10").
     """
-    h, w, in_channels = input_dims
+    # Adjust input channels based on dataset
+    if dataset_name == "CIFAR10":
+        in_channels = 3
+        h, w = 32, 32  # CIFAR-10 images are 32x32
+    elif dataset_name == "MNIST":
+        in_channels = 1
+        h, w = 28, 28  # MNIST images are 28x28
+    else:
+        h, w, in_channels = input_dims  # Default dimensions if provided explicitly
+
+    print(f"Dataset: {dataset_name}")
     print(f"Input Dimensions: Height={h}, Width={w}, Channels={in_channels}\n")
     
     num_layers = max(
