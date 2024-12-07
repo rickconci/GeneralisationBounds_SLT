@@ -159,7 +159,7 @@ if __name__ == '__main__':
     
     parser.add_argument('--accelerator', type=str, default='cpu', choices=['gpu', 'mps', 'cpu', 'auto'], help='Which accelerator to use')
 
-    parser.add_argument('--log_wandb', type=bool, default=False, help='Whether to log to wandb')
+    parser.add_argument('--log_wandb', type=bool, default=True, help='Whether to log to wandb')
     parser.add_argument('--project_name', type=str, default='SLT_project', help='Name of the wandb project')
     parser.add_argument('--seed', type=int, default=42, help='Seed for random number generators')
     parser.add_argument('--model_checkpoint', type=bool, default=False, help='Enable model checkpointing')
@@ -169,18 +169,20 @@ if __name__ == '__main__':
 
 
     kernel_dict = {
-        0: {'kernel_size': 3, 'out_channels': 16, 'stride': 1, 'padding': 1},
-        1: {'kernel_size': 3, 'out_channels': 32, 'stride': 1, 'padding': 1},
-        2: {'kernel_size': 3, 'out_channels': 64, 'stride': 1, 'padding': 1},
+        0: {'kernel_size': 3, 'out_channels': 32, 'stride': 1, 'padding': 1},  # Increased channels
+        1: {'kernel_size': 3, 'out_channels': 64, 'stride': 2, 'padding': 1},  # Increased channels
+        2: {'kernel_size': 3, 'out_channels': 128, 'stride': 2, 'padding': 1},  # Increased channels
+        3: {'kernel_size': 3, 'out_channels': 256, 'stride': 1, 'padding': 1},  # Deeper layer
+        4: {'kernel_size': 3, 'out_channels': 512, 'stride': 1, 'padding': 1},  # Increased depth
     }
 
-    max_pool_layer_dict = {
-        1: {'pool_size': 2, 'stride': 2}  # Moved to layer 2 and stride set to 2
-    }
+    max_pool_layer_dict = {}
 
     dropout_layer_dict = {
-        2: 0.5,  # Apply Dropout with p=0.5 after layer 3
-    }
+        1: 0.2,  # After the first down-sampling layer (layer 1)
+        3: 0.3,  # After layer 3 (feature extraction)
+        4: 0.3  # After layer 4 (deep feature extraction)
+    } 
 
     simulate_model_dimensions(kernel_dict, max_pool_layer_dict, dropout_layer_dict, input_dims=(28, 28, 3))
     

@@ -244,7 +244,8 @@ class ModularCNN(LightningModule):
 
     def configure_optimizers(self):
         # Define SGD optimizer with weight decay
-        optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        #optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
         return optimizer
     
 
