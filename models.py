@@ -12,9 +12,35 @@ import numpy as np
 from torch.optim.lr_scheduler import LambdaLR
 import torch.nn.init as init
 import math
+import os
+import csv
 
 
 from utils import max_pixel_sums, eval_rho, our_total_bound
+
+def effective_rank(tensor, epsilon=1e-12):
+    # Reshape tensor to a 2D matrix (for Conv layers, flatten spatial and input dims into one)
+    W = tensor.view(tensor.size(0), -1)
+
+    # Compute singular values
+    # torch.linalg.svd is preferred, but if you use older torch versions, you can use torch.svd
+    U, S, Vh = torch.linalg.svd(W, full_matrices=False)
+
+    # Filter out very small singular values
+    S = S[S > epsilon]
+    if S.numel() == 0:
+        # If all singular values are negligible, the effective rank is 0
+        return 0.0
+    
+    # Normalize singular values to form a probability distribution
+    p = S / S.sum()
+
+    # Compute entropy H = -sum p_i log p_i (natural log)
+    H = -torch.sum(p * torch.log(p))
+
+    # Effective rank = exp(H)
+    eff_rank = torch.exp(H)
+    return eff_rank
 
 
 class SparseDeepModel(LightningModule):
@@ -59,8 +85,16 @@ class SparseDeepModel(LightningModule):
         depth = len([layer for layer in self.model.modules() if isinstance(layer, (torch.nn.Conv2d, torch.nn.Linear))])
 
         # Compute the generalization bound using the utility function
-        bound = our_total_bound(self, data_loader, num_classes, dataset_size, depth)
-        self.log("generalization_bound", bound, prog_bar=True)
+        bound, mult1, mult2, mult3, add1 = our_total_bound(self, data_loader, num_classes, dataset_size, depth)
+
+        # Log the bound as before
+        self.log("train_generalization_bound", bound, prog_bar=True)
+
+        # Log the intermediate values to a "folder" named "bound_components" in W&B
+        self.log("bound_components/train_mult1", mult1, prog_bar=False)
+        self.log("bound_components/train_mult2", mult2, prog_bar=False)
+        self.log("bound_components/train_mult3", mult3, prog_bar=False)
+        self.log("bound_components/train_add1", add1, prog_bar=False)
 
         return loss
 
@@ -94,8 +128,16 @@ class SparseDeepModel(LightningModule):
         depth = len([layer for layer in self.model.modules() if isinstance(layer, (torch.nn.Conv2d, torch.nn.Linear))])
 
         # Compute the generalization bound using the utility function
-        bound = our_total_bound(self, data_loader, num_classes, dataset_size, depth)
-        self.log("generalization_bound", bound, prog_bar=True)
+        bound, mult1, mult2, mult3, add1 = our_total_bound(self, data_loader, num_classes, dataset_size, depth)
+
+        # Log the bound as before
+        self.log("test_generalization_bound", bound, prog_bar=True)
+
+        # Log the intermediate values to a "folder" named "bound_components" in W&B
+        self.log("bound_components/test_mult1", mult1, prog_bar=False)
+        self.log("bound_components/test_mult2", mult2, prog_bar=False)
+        self.log("bound_components/test_mult3", mult3, prog_bar=False)
+        self.log("bound_components/test_add1", add1, prog_bar=False)
 
         return loss
 
@@ -122,7 +164,7 @@ class ModularCNN(LightningModule):
         self.num_classes = num_classes
 
         # Assuming grayscale images; change to 3 if using RGB images
-        in_channels = 3
+        in_channels = 1
         h, w = 28, 28  # Input image dimensions
 
         layers = []
@@ -187,6 +229,14 @@ class ModularCNN(LightningModule):
         self.accuracy = Accuracy(task='multiclass', num_classes=num_classes)
         self.save_hyperparameters()
 
+        self.weight_layers = []
+        for layer in self.model.modules():
+            if isinstance(layer, (nn.Conv2d, nn.Linear)):
+                self.weight_layers.append(layer)
+
+        self.csv_file_path = os.path.join("csv_files", "layer_stats.csv")
+        self.csv_header_written = False
+
         self.apply(self._init_weights)  # Apply weight initialization
 
     def _init_weights(self, module):
@@ -231,8 +281,56 @@ class ModularCNN(LightningModule):
         depth = len([layer for layer in self.model.modules() if isinstance(layer, (torch.nn.Conv2d, torch.nn.Linear))])
 
         # Compute the generalization bound using the utility function
-        bound = our_total_bound(self, data_loader, num_classes, dataset_size, depth)
-        self.log("generalization_bound", bound, prog_bar=True)
+        bound, mult1, mult2, mult3, add1 = our_total_bound(self, data_loader, num_classes, dataset_size, depth)
+
+        # Log the bound as before
+        self.log("train_generalization_bound", bound, prog_bar=True)
+
+        # Log the intermediate values to a "folder" named "bound_components" in W&B
+        self.log("bound_components/train_mult1", mult1, prog_bar=False)
+        self.log("bound_components/train_mult2", mult2, prog_bar=False)
+        self.log("bound_components/train_mult3", mult3, prog_bar=False)
+        self.log("bound_components/train_add1", add1, prog_bar=False)
+
+        # Iterate over all Conv2d/Linear layers and log their Frobenius norms and ranks
+        layer_idx = 0
+        for layer in self.model.modules():
+            if isinstance(layer, (nn.Conv2d, nn.Linear)):
+                w = layer.weight
+                # Frobenius norm of the weight matrix
+                fro_norm = torch.norm(w, p='fro')
+
+                # Compute rank: reshape weight to a 2D matrix and compute matrix rank
+                w_matrix = w.view(w.size(0), -1)
+                rank = effective_rank(w_matrix)
+
+                # Log these values
+                # Using a consistent naming scheme groups them in W&B:
+                # "weight_fro_norm/layer_0", "weight_fro_norm/layer_1", etc.
+                self.log(f"weight_fro_norm/layer_{layer_idx}", fro_norm, on_step=True, on_epoch=False)
+                self.log(f"weight_ranks/layer_{layer_idx}", rank, on_step=True, on_epoch=False)
+                layer_idx += 1
+
+        # Compute Frobenius norm and effective rank for each layer
+        norms = []
+        ranks = []
+        for layer in self.weight_layers:
+            w = layer.weight
+            fro_norm = torch.norm(w, p='fro')
+            eff_r = effective_rank(w)
+            norms.append(fro_norm.item())
+            ranks.append(eff_r.item())
+
+        # Append a row to the CSV file
+        step = self.global_step
+        row = [step]
+        for n, r in zip(norms, ranks):
+            row.append(n)
+            row.append(r)
+
+        with open(self.csv_file_path, mode='a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(row)
 
         return loss
 
@@ -266,8 +364,16 @@ class ModularCNN(LightningModule):
         depth = len([layer for layer in self.model.modules() if isinstance(layer, (torch.nn.Conv2d, torch.nn.Linear))])
 
         # Compute the generalization bound using the utility function
-        bound = our_total_bound(self, data_loader, num_classes, dataset_size, depth)
-        self.log("generalization_bound", bound, prog_bar=True)
+        bound, mult1, mult2, mult3, add1 = our_total_bound(self, data_loader, num_classes, dataset_size, depth)
+
+        # Log the bound as before
+        self.log("test_generalization_bound", bound, prog_bar=True)
+
+        # Log the intermediate values to a "folder" named "bound_components" in W&B
+        self.log("bound_components/test_mult1", mult1, prog_bar=False)
+        self.log("bound_components/test_mult2", mult2, prog_bar=False)
+        self.log("bound_components/test_mult3", mult3, prog_bar=False)
+        self.log("bound_components/test_add1", add1, prog_bar=False)
 
         return loss
 
@@ -293,11 +399,26 @@ class ModularCNN(LightningModule):
             }
         }
     
+    def on_fit_start(self):
+        # Create the directory if it doesn't exist
+        os.makedirs("csv_files", exist_ok=True)
+
+        # Prepare CSV header: one column for step, then norm_i and rank_i for each layer
+        header = ["step"]
+        for i, _ in enumerate(self.weight_layers):
+            header.append(f"norm_{i}")
+            header.append(f"rank_{i}")
+
+        # Write the header
+        with open(self.csv_file_path, mode='w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(header)
+        self.csv_header_written = True
 
 
 
 def simulate_model_dimensions(kernel_sizes, out_channels, strides, paddings, 
-                              pool_sizes, input_dims):
+                              pool_sizes, input_dims, dataset_name="MNIST"):
     """
     Simulates the dimensions of the data as it passes through the model layers.
     
@@ -308,8 +429,19 @@ def simulate_model_dimensions(kernel_sizes, out_channels, strides, paddings,
         paddings (list): List of paddings for the convolutional layers.
         pool_sizes (list): List of pooling sizes for max pooling layers.
         input_dims (tuple): A tuple (height, width, channels) representing the input dimensions.
+        dataset_name (str): Name of the dataset (e.g., "MNIST", "CIFAR10").
     """
-    h, w, in_channels = input_dims
+    # Adjust input channels based on dataset
+    if dataset_name == "CIFAR10":
+        in_channels = 3
+        h, w = 32, 32  # CIFAR-10 images are 32x32
+    elif dataset_name == "MNIST":
+        in_channels = 1
+        h, w = 28, 28  # MNIST images are 28x28
+    else:
+        h, w, in_channels = input_dims  # Default dimensions if provided explicitly
+
+    print(f"Dataset: {dataset_name}")
     print(f"Input Dimensions: Height={h}, Width={w}, Channels={in_channels}\n")
     
     num_layers = max(len(kernel_sizes), len(pool_sizes))

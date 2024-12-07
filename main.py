@@ -133,7 +133,7 @@ def main(args):
         max_epochs=args.max_epochs,
         accelerator=args.accelerator,
         logger=wandb_logger,
-        log_every_n_steps=10,
+        log_every_n_steps=5,
         callbacks=callbacks,
         #fast_dev_run = True,
         #overfit_batches = 1
@@ -155,7 +155,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description="Train a model on CV dataset")
     # Experiment specific args 
-    parser.add_argument('--dataset_name', type=str, default='CIFAR10', choices=['CIFAR10', 'ImageNet'], help='Dataset to use')
+    parser.add_argument('--dataset_name', type=str, default='MNIST', choices=['MNIST', 'CIFAR10', 'ImageNet'], help='Dataset to use')
     parser.add_argument('--train_subset_fraction', type=float, default=1.0, help='Size of the training subset to use')
     parser.add_argument('--val_subset_fraction', type=float, default=1.0, help='Size of the validation subset to use')
     
@@ -188,17 +188,6 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
 
-    '''
-    kernel_dict = {
-        0: {'kernel_size': 3, 'out_channels': 32, 'stride': 1, 'padding': 1},  # Increased channels
-        1: {'kernel_size': 3, 'out_channels': 64, 'stride': 2, 'padding': 1},  # Increased channels
-       3: {'kernel_size': 3, 'out_channels': 256, 'stride': 1, 'padding': 1},  # Deeper layer
-        2: {'kernel_size': 3, 'out_channels': 128, 'stride': 2, 'padding': 1},  # Increased channels
-        4: {'kernel_size': 3, 'out_channels': 256, 'stride': 1, 'padding': 1},  # Increased depth
-    }
-    '''
-    dropout_list = [] 
-    max_pool_layer_dict = {}
 
     if args.dataset_name == 'MNIST':
         input_dims = (28, 28, 1)

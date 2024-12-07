@@ -45,6 +45,12 @@ class DataModule(L.LightningDataModule):
                 transforms.ToTensor(),
                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
             ])  
+        elif dataset_name == 'MNIST':
+            self.num_classes = 10
+            self.transform = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.5,), (0.5,))  # Normalize grayscale images
+            ])
 
     
     def setup(self, stage=None):
@@ -56,6 +62,39 @@ class DataModule(L.LightningDataModule):
             # Load CIFAR-10 dataset
             self.train = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=self.transform)
             self.val_test = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=self.transform)
+            
+            # Split the validation set into validation and test sets by 90% and 10% respectively    
+            self.val = Subset(self.val_test, range(0, int(0.9 * len(self.val_test))))
+            self.test = Subset(self.val_test, range(int(0.9 * len(self.val_test)), len(self.val_test)))
+    
+            # Create a smaller subset of the training dataset if specified
+            if self.train_subset_fraction is not None:
+                indices = np.random.choice(len(self.train), int(self.train_subset_fraction * len(self.train)), replace=False)  # Random subset
+                self.train = Subset(self.train, indices) 
+    
+            # Create a smaller subset of the validation dataset if specified
+            if self.val_subset_fraction is not None:
+                val_indices = np.random.choice(len(self.val), int(self.val_subset_fraction * len(self.val)), replace=False)  # Random subset
+                self.val = Subset(self.val, val_indices)
+            
+            # Apply random labels if specified
+            if self.random_label_fraction is not None:
+                self.randomize_labels()
+    
+            if self.noise_image_fraction is not None:
+                self.noisy_images()
+    
+            # Cache datasets on GPU
+            self.train = GpuCachedDataset(self.train, device)
+            self.val = GpuCachedDataset(self.val, device)
+            self.test = GpuCachedDataset(self.test, device)
+
+        elif self.dataset_name == 'MNIST':            
+            ssl._create_default_https_context = ssl._create_unverified_context
+    
+            # Load MNIST dataset
+            self.train = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=self.transform)
+            self.val_test = torchvision.datasets.MNIST(root='./data', train=False, download=True, transform=self.transform)
             
             # Split the validation set into validation and test sets by 90% and 10% respectively    
             self.val = Subset(self.val_test, range(0, int(0.9 * len(self.val_test))))
