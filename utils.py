@@ -35,7 +35,7 @@ def eval_rho(net):
 
 def our_total_bound(net, data_loader, num_classes, dataset_size, depth, delta=0.001):
     """
-    Compute the generalization bound for the given model.
+    Compute the generalization bound for the given model and return intermediate values.
     """
     rho = eval_rho(net)
     n = dataset_size
@@ -47,11 +47,11 @@ def our_total_bound(net, data_loader, num_classes, dataset_size, depth, delta=0.
     mult1 = (rho + 1) / n
     mult2 = 2 ** 1.5 * (1 + math.sqrt(2 * (depth * np.log(2 * max_deg) + np.log(k))))
     max_sum_sqrt = math.sqrt(max_pixel_sums(data_loader))
-    mult3 = max_sum_sqrt * deg_prod
+    mult3 = max_sum_sqrt * math.sqrt(deg_prod)
 
     # Additional term
     add1 = 3 * math.sqrt(np.log((2 * (rho + 2) ** 2) / delta) / (2 * n))
 
     # Final bound
     bound = mult1 * mult2 * mult3 + add1
-    return bound
+    return bound, mult1, mult2, mult3, add1
