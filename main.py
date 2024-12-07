@@ -16,7 +16,7 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.profilers import SimpleProfiler, AdvancedProfiler
 
 from data import DataModule
-from models import SparseDeepModel, ModularCNN, simulate_model_dimensions
+from models import SparseDeepModel, ModularCNN, simulate_model_dimensions, calculate_total_params, create_kernel_dict
 
 wandb.login(key = '3c5767e934e3aa77255fc6333617b6e0a2aab69f')
 
@@ -32,7 +32,7 @@ def set_seed(seed):
     torch.backends.cudnn.benchmark = False
 
 
-def main(args, kernel_dict, max_pool_layer_dict, dropout_layer_dict):
+def main(args):
 
     print('CUDA GPUs present?', torch.cuda.is_available())
     print(torch.cuda.current_device())  # Should print the device index
@@ -79,6 +79,10 @@ def main(args, kernel_dict, max_pool_layer_dict, dropout_layer_dict):
                              val_subset_fraction = args.val_subset_fraction)
 
     #define model
+    kernel_dict = create_kernel_dict(args.kernel_sizes, args.out_channels, args.strides, args.paddings)
+    max_pool_layer_dict = {}
+    dropout_layer_dict = {}
+
     if args.model_type == 'ModularCNN':
         model = ModularCNN(kernel_dict=kernel_dict, 
                            max_pool_layer_dict=max_pool_layer_dict, 
@@ -129,7 +133,7 @@ def main(args, kernel_dict, max_pool_layer_dict, dropout_layer_dict):
         max_epochs=args.max_epochs,
         accelerator=args.accelerator,
         logger=wandb_logger,
-        log_every_n_steps=20,
+        log_every_n_steps=10,
         callbacks=callbacks,
         #fast_dev_run = True,
         #overfit_batches = 1
@@ -164,7 +168,7 @@ if __name__ == '__main__':
 
     # Trainer specific args
     parser.add_argument('--lr', type=float, default=0.01, help='Learning rate')
-    parser.add_argument('--batch_size', type=int, default=8192, help='Batch size')
+    parser.add_argument('--batch_size', type=int, default=4096, help='Batch size')
     parser.add_argument('--weight_decay', type=float, default=0.0001, help='Weight decay')
     parser.add_argument('--max_epochs', type=int, default=400, help='Maximum number of epochs to train')
     
@@ -176,37 +180,38 @@ if __name__ == '__main__':
     parser.add_argument('--model_checkpoint', type=bool, default=False, help='Enable model checkpointing')
     parser.add_argument('--early_stopping', type=bool, default=False, help='Enable early stopping')
 
+
+    parser.add_argument('--kernel_sizes', nargs='+', type=int, default=[2, 2, 2 ], help='List of kernel sizes for each layer')
+    parser.add_argument('--out_channels', nargs='+', type=int, default=[200, 200, 200], help='List of output channels for each layer')
+    parser.add_argument('--strides', nargs='+', type=int, default=[1, 1, 1], help='List of strides for each layer')
+    parser.add_argument('--paddings', nargs='+', type=int, default=[0, 0, 0], help='List of paddings for each layer')
+    
     args = parser.parse_args()
 
-
-    #kernel_dict = {
-    #    0: {'kernel_size': 3, 'out_channels': 16, 'stride': 1, 'padding': 1},  # Initial layer
-    #    1: {'kernel_size': 3, 'out_channels': 32, 'stride': 2, 'padding': 1},  # Down-sampling via stride
-    #    2: {'kernel_size': 3, 'out_channels': 64, 'stride': 2, 'padding': 1},  # Further down-sampling
-    #    3: {'kernel_size': 3, 'out_channels': 128, 'stride': 1, 'padding': 1},  # Feature extraction
-    #    4: {'kernel_size': 3, 'out_channels': 256, 'stride': 1, 'padding': 1},  # Deeper layer
-    #}
-
+    '''
     kernel_dict = {
         0: {'kernel_size': 3, 'out_channels': 32, 'stride': 1, 'padding': 1},  # Increased channels
         1: {'kernel_size': 3, 'out_channels': 64, 'stride': 2, 'padding': 1},  # Increased channels
+       3: {'kernel_size': 3, 'out_channels': 256, 'stride': 1, 'padding': 1},  # Deeper layer
         2: {'kernel_size': 3, 'out_channels': 128, 'stride': 2, 'padding': 1},  # Increased channels
-        3: {'kernel_size': 3, 'out_channels': 256, 'stride': 1, 'padding': 1},  # Deeper layer
         4: {'kernel_size': 3, 'out_channels': 256, 'stride': 1, 'padding': 1},  # Increased depth
     }
-
+    '''
+    dropout_list = [] 
     max_pool_layer_dict = {}
-    #max_pool_layer_dict = {
-    #    1: {'pool_size': 2, 'stride': 2}  # Moved to layer 2 and stride set to 2
-    #}
 
-    dropout_layer_dict = {
-        1: 0.2,  # After the first down-sampling layer (layer 1)
-        3: 0.3,  # After layer 3 (feature extraction)
-        4: 0.3  # After layer 4 (deep feature extraction)
-    } 
+    if args.dataset_name == 'MNIST':
+        input_dims = (28, 28, 1)
+        num_classes = 10
+    elif args.dataset_name == 'CIFAR10':
+        input_dims = (28, 28, 3)
+        num_classes = 10
+    elif args.dataset_name == 'ImageNet':
+        input_dims = (224, 224, 3)
+        num_classes = 1000
 
-    simulate_model_dimensions(kernel_dict, max_pool_layer_dict, dropout_layer_dict, input_dims=(28, 28, 3))
+    calculate_total_params(args, input_dims=input_dims, num_classes=num_classes)
+    simulate_model_dimensions(args.kernel_sizes, args.out_channels, args.strides, args.paddings, input_dims=input_dims)
     
     
-    main(args, kernel_dict, max_pool_layer_dict, dropout_layer_dict)
+    main(args)

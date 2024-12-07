@@ -11,6 +11,7 @@ import math
 import numpy as np
 from torch.optim.lr_scheduler import LambdaLR
 import torch.nn.init as init
+import math
 
 
 from utils import max_pixel_sums, eval_rho, our_total_bound
@@ -295,35 +296,33 @@ class ModularCNN(LightningModule):
 
 
 
-def simulate_model_dimensions(kernel_dict, max_pool_layer_dict, dropout_layer_dict, input_dims):
+def simulate_model_dimensions(kernel_sizes, out_channels, strides, paddings, 
+                              pool_sizes, input_dims):
     """
     Simulates the dimensions of the data as it passes through the model layers.
     
     Args:
-        kernel_dict (dict): Nested dictionary describing the convolutional layers.
-        max_pool_layer_dict (dict): Dictionary describing the max pooling layers.
-        dropout_layer_dict (dict): Dictionary describing the dropout layers.
+        kernel_sizes (list): List of kernel sizes for the convolutional layers.
+        out_channels (list): List of output channels for the convolutional layers.
+        strides (list): List of strides for the convolutional layers.
+        paddings (list): List of paddings for the convolutional layers.
+        pool_sizes (list): List of pooling sizes for max pooling layers.
         input_dims (tuple): A tuple (height, width, channels) representing the input dimensions.
     """
     h, w, in_channels = input_dims
     print(f"Input Dimensions: Height={h}, Width={w}, Channels={in_channels}\n")
     
-    num_layers = max(
-        max(kernel_dict.keys(), default=0),
-        max(max_pool_layer_dict.keys(), default=0),
-        max(dropout_layer_dict.keys(), default=0)
-    )
+    num_layers = max(len(kernel_sizes), len(pool_sizes))
     
-    for layer_idx in range(num_layers + 1):
+    for layer_idx in range(num_layers):
         print(f"Layer {layer_idx}:")
         
         # Convolutional Layer
-        if layer_idx in kernel_dict:
-            layer_params = kernel_dict[layer_idx]
-            kernel_size = layer_params['kernel_size']
-            out_channels = layer_params['out_channels']
-            stride = layer_params.get('stride', 1)
-            padding = layer_params.get('padding', 0)
+        if layer_idx < len(kernel_sizes):
+            kernel_size = kernel_sizes[layer_idx]
+            out_channel = out_channels[layer_idx]
+            stride = strides[layer_idx]
+            padding = paddings[layer_idx]
             
             # Compute output dimensions after convolution
             h_out = (h + 2 * padding - kernel_size) // stride + 1
@@ -331,35 +330,12 @@ def simulate_model_dimensions(kernel_dict, max_pool_layer_dict, dropout_layer_di
             
             print(f"  Conv2d: kernel_size={kernel_size}, stride={stride}, padding={padding}")
             print(f"    Input Channels: {in_channels}")
-            print(f"    Output Channels: {out_channels}")
+            print(f"    Output Channels: {out_channel}")
             print(f"    Output Dimensions: Height={h_out}, Width={w_out}")
             
             # Update dimensions and channels for next layer
             h, w = h_out, w_out
-            in_channels = out_channels
-            
-        # Max Pooling Layer
-        if layer_idx in max_pool_layer_dict:
-            layer_params = max_pool_layer_dict[layer_idx]
-            pool_size = layer_params['pool_size']
-            stride = layer_params.get('stride', pool_size)
-            padding = layer_params.get('padding', 0)
-            
-            # Compute output dimensions after pooling
-            h_out = (h + 2 * padding - pool_size) // stride + 1
-            w_out = (w + 2 * padding - pool_size) // stride + 1
-            
-            print(f"  MaxPool2d: pool_size={pool_size}, stride={stride}, padding={padding}")
-            print(f"    Output Dimensions: Height={h_out}, Width={w_out}")
-            
-            # Update dimensions for next layer
-            h, w = h_out, w_out
-            
-        # Dropout Layer
-        if layer_idx in dropout_layer_dict:
-            p = dropout_layer_dict[layer_idx]
-            print(f"  Dropout: p={p}")
-            # Dropout does not change dimensions
+            in_channels = out_channel
             
         print("")  # Empty line for readability
     
@@ -376,3 +352,63 @@ def simulate_model_dimensions(kernel_dict, max_pool_layer_dict, dropout_layer_di
         print("The dimensions are valid for the linear layer input.")
 
     return num_flat_features
+
+
+
+def calculate_total_params(args, input_size=(28, 28), num_classes=10):
+    in_channels = 1  # MNIST images are grayscale
+    total_params = 0
+    current_height, current_width = input_size
+
+    # Calculate parameters for convolutional layers
+    for i in range(len(args.kernel_sizes)):
+        kernel_size = args.kernel_sizes[i]
+        out_channels = args.out_channels[i]
+        stride = args.strides[i]
+        padding = args.paddings[i]
+
+        # Parameters: (kernel_size * kernel_size * in_channels + 1) * out_channels
+        conv_params = (kernel_size * kernel_size * in_channels + 1) * out_channels
+        total_params += conv_params
+
+        # Update feature map size
+        current_height = math.floor((current_height + 2 * padding - kernel_size) / stride) + 1
+        current_width = math.floor((current_width + 2 * padding - kernel_size) / stride) + 1
+
+        # Update in_channels for next layer
+        in_channels = out_channels
+
+    # Parameters for the fully connected layer
+    fc_input_size = current_height * current_width * in_channels
+    fc_params = (fc_input_size + 1) * num_classes  # +1 for bias
+    total_params += fc_params
+
+    return total_params
+
+
+
+def create_kernel_dict(kernel_sizes, out_channels, strides, paddings):
+    """
+    Converts lists of kernel parameters into a kernel_dict structure.
+
+    Args:
+        kernel_sizes (list): List of kernel sizes for each layer.
+        out_channels (list): List of output channels for each layer.
+        strides (list): List of strides for each layer.
+        paddings (list): List of paddings for each layer.
+
+    Returns:
+        dict: A dictionary with layer indices as keys and kernel parameters as values.
+    """
+    kernel_dict = {}
+    num_layers = len(kernel_sizes)
+    
+    for i in range(num_layers):
+        kernel_dict[i] = {
+            'kernel_size': kernel_sizes[i],
+            'out_channels': out_channels[i],
+            'stride': strides[i],
+            'padding': paddings[i],
+        }
+    
+    return kernel_dict
