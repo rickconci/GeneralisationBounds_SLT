@@ -121,9 +121,9 @@ def main(args):
     if args.early_stopping:
         early_stopping = EarlyStopping(
             min_delta=0.00,
-            monitor='val_loss',        # Ensure this is the exact name used in your logging
-            patience=100,                    # num epochs with a val loss not improving before it stops 
-            mode='min',                     # Minimize the monitored value
+            monitor='train_acc',        # Ensure this is the exact name used in your logging
+            patience=40,                    # num epochs with a val loss not improving before it stops 
+            mode='max',                     # max the monitored value
             verbose=True
         )
         callbacks.append(early_stopping)
