@@ -52,15 +52,26 @@ for ((i = 0; i < num_combinations; i++)); do
     batch_size=${hyperparams[2]}
     architecture=${hyperparams[@]:3}  # Extract architecture
 
+    # Determine early_stopping and max_epochs based on random_label_fraction
+    if [ "$random_label_fraction" == "None" ]; then
+        early_stopping=true
+        max_epochs=250
+    else
+        early_stopping=false
+        max_epochs=800
+    fi
+
     # Parse architecture into separate arguments
     IFS='|' read -r kernel_sizes strides paddings out_channels <<< "$architecture"
 
     # Run the Python script on the assigned GPU
-    echo "Starting on GPU $gpu_id with lr=$lr, batch_size=$batch_size, random_label_fraction=$random_label_fraction, architecture=($kernel_sizes $strides $paddings $out_channels)"
+    echo "Starting on GPU $gpu_id with lr=$lr, batch_size=$batch_size, random_label_fraction=$random_label_fraction, early_stopping=$early_stopping, max_epochs=$max_epochs, architecture=($kernel_sizes $strides $paddings $out_channels)"
     CUDA_VISIBLE_DEVICES=$gpu_id nohup python $SCRIPT_PATH \
         --lr $lr \
         --batch_size $batch_size \
         --random_label_fraction $random_label_fraction \
+        --early_stopping $early_stopping \
+        --max_epochs $max_epochs \
         --kernel_sizes $kernel_sizes \
         --strides $strides \
         --paddings $paddings \
