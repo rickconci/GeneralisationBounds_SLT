@@ -5,30 +5,65 @@ import numpy as np
 import torchvision
 import argparse
 
-def max_pixel_sums(data_loader):
+# def max_pixel_sums(data_loader):
+#     """
+#     Compute the maximum pixel sum for squared images in the dataset.
+#     """
+#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    
+#     # Get image size from the first batch
+#     first_batch = next(iter(data_loader))
+#     images, _ = first_batch
+#     image_size = images[0].size()
+
+#     # Initialize a tensor to hold the pixel sums
+#     pixel_sums = torch.zeros(image_size, device=device)
+
+#     # Loop over all images in the dataset and accumulate pixel sums
+#     for images, _ in data_loader:
+#         images = images.to(device)
+#         pixel_sums += torch.sum(torch.pow(images, 2), dim=0)
+    
+#     #print(f"Pixel sums device: {pixel_sums.device}")
+#     #print(f"Images device: {images.device}")
+
+#     # Return the max value of pixel sums
+#     return pixel_sums.max().item()
+
+def max_pixel_sums(dataset):
     """
-    Compute the maximum pixel sum for squared images in the dataset.
+    Compute the maximum pixel sum for squared images in the dataset by iterating over each image.
+
+    Args:
+        dataset: PyTorch Dataset object.
+
+    Returns:
+        float: Maximum sum of squared pixels across all images in the dataset.
     """
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    
-    # Get image size from the first batch
-    first_batch = next(iter(data_loader))
-    images, _ = first_batch
-    image_size = images[0].size()
+    # Check if the dataset is a Subset
+    if isinstance(dataset, torch.utils.data.Subset):
+        indices = dataset.indices
+        dataset = dataset.dataset  # Access the underlying dataset
+    else:
+        indices = range(len(dataset))  # All indices for non-Subset datasets
+
+    # Get the size of the first image
+    image, _ = dataset[indices[0]]
+    image_size = image.size()
 
     # Initialize a tensor to hold the pixel sums
     pixel_sums = torch.zeros(image_size, device=device)
 
-    # Loop over all images in the dataset and accumulate pixel sums
-    for images, _ in data_loader:
-        images = images.to(device)
-        pixel_sums += torch.sum(torch.pow(images, 2), dim=0)
-    
-    #print(f"Pixel sums device: {pixel_sums.device}")
-    #print(f"Images device: {images.device}")
+    # Loop through all images in the dataset and compute squared pixel sums
+    for i in range(len(dataset)):
+        image, _ = dataset[i]  # No need to transform; already a tensor
+        pixel_sums += torch.pow(image, 2)
 
-    # Return the max value of pixel sums
+    # Return the maximum value from the summed pixel tensor
     return pixel_sums.max().item()
 
 def eval_rho(net):
@@ -41,23 +76,57 @@ def eval_rho(net):
             rho *= torch.norm(layer.weight.data, p='fro').item()
     return rho
 
-def our_total_bound(net, data_loader, num_classes, dataset_size, depth, delta=0.001):
+# def our_total_bound(net, data_loader, num_classes, dataset_size, depth, delta=0.001):
+#     """
+#     Compute the generalization bound for the given model and return intermediate values.
+#     """
+#     rho = eval_rho(net)
+#     n = dataset_size
+#     k = num_classes
+#     max_deg = 2  # Assuming ReLU activations (degree 2)
+#     deg_prod = max_deg ** depth  # Approximation for product of degrees
+
+#     # Multiplier terms
+#     mult1 = (rho + 1) / n
+#     mult2 = 2 ** 1.5 * (1 + math.sqrt(2 * (depth * np.log(2 * max_deg) + np.log(k))))
+#     max_sum_sqrt = math.sqrt(max_pixel_sums(data_loader))
+#     mult3 = max_sum_sqrt * math.sqrt(deg_prod)
+
+#     # Additional term
+#     add1 = 3 * math.sqrt(np.log((2 * (rho + 2) ** 2) / delta) / (2 * n))
+
+#     # Final bound
+#     bound = mult1 * mult2 * mult3 + add1
+#     return bound, mult1, mult2, mult3, add1
+
+def our_total_bound(net, num_classes, dataset_size, depth, kernel_dict, max_pixel_sum, delta=0.001):
     """
     Compute the generalization bound for the given model and return intermediate values.
+
+    Args:
+        net: The neural network.
+        data_loader: Data loader for the dataset.
+        num_classes: Number of classes in the dataset.
+        dataset_size: Number of samples in the dataset.
+        depth: Depth of the network (number of layers with parameters).
+        kernel_dict: Dictionary of convolutional layer configurations.
+        delta: Small constant for numerical stability.
+
+    Returns:
+        bound, mult1, mult2, mult3, add1: Generalization bound and intermediate values.
     """
+    # Compute rho (product of Frobenius norms of all layers)
     rho = eval_rho(net)
     n = dataset_size
     k = num_classes
-    max_deg = 2  # Assuming ReLU activations (degree 2)
-    deg_prod = max_deg ** depth  # Approximation for product of degrees
 
-    # Multiplier terms
+    kernel_sizes = np.array([params['kernel_size'] for params in kernel_dict.values()])
+    #max_deg = max(kernel_sizes)**2 
+    deg_prod = np.prod(kernel_sizes)
+
     mult1 = (rho + 1) / n
-    mult2 = 2 ** 1.5 * (1 + math.sqrt(2 * (depth * np.log(2 * max_deg) + np.log(k))))
-    max_sum_sqrt = math.sqrt(max_pixel_sums(data_loader))
-    mult3 = max_sum_sqrt * math.sqrt(deg_prod)
-
-    # Additional term
+    mult2 = 2 ** 1.5 * (1 + math.sqrt(2 * (depth * np.log(2) + sum(np.log((kernel_sizes)**2)) + np.log(k))))
+    mult3 = math.sqrt(max_pixel_sum) * deg_prod
     add1 = 3 * math.sqrt(np.log((2 * (rho + 2) ** 2) / delta) / (2 * n))
 
     # Final bound

@@ -164,6 +164,9 @@ class ModularCNN(LightningModule):
         self.max_steps = max_steps
         self.num_classes = num_classes
 
+        self.kernel_dict = kernel_dict
+        self.max_pixel_sum = None
+
         # Assuming grayscale images; change to 3 if using RGB images
         in_channels = 1
         h, w = 28, 28  # Input image dimensions
@@ -282,7 +285,7 @@ class ModularCNN(LightningModule):
         depth = len([layer for layer in self.model.modules() if isinstance(layer, (torch.nn.Conv2d, torch.nn.Linear))])
 
         # Compute the generalization bound using the utility function
-        bound, mult1, mult2, mult3, add1 = our_total_bound(self, data_loader, num_classes, dataset_size, depth)
+        bound, mult1, mult2, mult3, add1 = our_total_bound(self, num_classes, dataset_size, depth, self.kernel_dict, self.max_pixel_sum)
 
         # Log the bound as before
         self.log("train_generalization_bound", bound, prog_bar=True)
@@ -365,7 +368,7 @@ class ModularCNN(LightningModule):
         depth = len([layer for layer in self.model.modules() if isinstance(layer, (torch.nn.Conv2d, torch.nn.Linear))])
 
         # Compute the generalization bound using the utility function
-        bound, mult1, mult2, mult3, add1 = our_total_bound(self, data_loader, num_classes, dataset_size, depth)
+        bound, mult1, mult2, mult3, add1 = our_total_bound(self, num_classes, dataset_size, depth, self.kernel_dict, self.max_pixel_sum)
 
         # Log the bound as before
         self.log("test_generalization_bound", bound, prog_bar=True)

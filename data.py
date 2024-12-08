@@ -52,6 +52,9 @@ class DataModule(L.LightningDataModule):
                 transforms.Normalize((0.5,), (0.5,))  # Normalize grayscale images
             ])
 
+    @property
+    def train_dataset(self):
+        return self.train
     
     def setup(self, stage=None):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

@@ -17,7 +17,7 @@ from lightning.pytorch.profilers import SimpleProfiler, AdvancedProfiler
 
 from data import DataModule
 from models import SparseDeepModel, ModularCNN
-from utils import none_or_float, simulate_model_dimensions, calculate_total_params, create_kernel_dict
+from utils import none_or_float, simulate_model_dimensions, calculate_total_params, create_kernel_dict, max_pixel_sums
 
 
 wandb.login(key = '3c5767e934e3aa77255fc6333617b6e0a2aab69f')
@@ -122,14 +122,26 @@ def main(args):
         early_stopping = EarlyStopping(
             min_delta=0.00,
             monitor='train_acc',        # Ensure this is the exact name used in your logging
-            patience=40,                    # num epochs with a val loss not improving before it stops 
-            mode='max',                     # max the monitored value
+            patience=50,                    # num epochs with a val loss not improving before it stops 
+            mode='max',                     # Minimize the monitored value
             verbose=True
         )
         callbacks.append(early_stopping)
 
     #callbacks.append[DeviceStatsMonitor()]
 
+    # Call setup to initialize datasets
+    data_module.setup()
+
+    # Access the training dataset directly
+    train_dataset = data_module.train
+
+    # Compute max pixel sums one by one
+    max_pixel_sum = max_pixel_sums(train_dataset)
+    print(f"Max Pixel Sums (One by One): {max_pixel_sum}")
+
+    # Pass max_pixel_sum to the trainer (using LightningModule's `configure_optimizers`)
+    model.max_pixel_sum = max_pixel_sum
 
     trainer = Trainer(
         max_epochs=args.max_epochs,
@@ -161,7 +173,7 @@ if __name__ == '__main__':
     parser.add_argument('--train_subset_fraction', type=float, default=1.0, help='Size of the training subset to use')
     parser.add_argument('--val_subset_fraction', type=float, default=1.0, help='Size of the validation subset to use')
     
-    parser.add_argument('--random_label_fraction', type=none_or_float, default=None, help='Fraction of labels to randomize in the training dataset. Must be between 0.0 (no random labels) and 1.0 (all labels randomized.)')
+    parser.add_argument('--random_label_fraction', type=none_or_float, default=1.0, help='Fraction of labels to randomize in the training dataset. Must be between 0.0 (no random labels) and 1.0 (all labels randomized.)')
     parser.add_argument('--noise_image_fraction', type=none_or_float, default=None, help='Fraction of noise to add to training data. Must be between 0.0 (no noise) and 1.0 (pure noise).')
 
     # Model specific args
@@ -172,7 +184,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
     parser.add_argument('--batch_size', type=int, default=2048, help='Batch size')
     parser.add_argument('--weight_decay', type=float, default=0.0001, help='Weight decay')
-    parser.add_argument('--max_epochs', type=int, default=800, help='Maximum number of epochs to train')
+    parser.add_argument('--max_epochs', type=int, default=2000, help='Maximum number of epochs to train')
     
     parser.add_argument('--accelerator', type=str, default='gpu', choices=['gpu', 'mps', 'cpu', 'auto'], help='Which accelerator to use')
 
@@ -180,7 +192,7 @@ if __name__ == '__main__':
     parser.add_argument('--project_name', type=str, default='SLT_project', help='Name of the wandb project')
     parser.add_argument('--seed', type=int, default=42, help='Seed for random number generators')
     parser.add_argument('--model_checkpoint', type=bool, default=False, help='Enable model checkpointing')
-    parser.add_argument('--early_stopping', type=bool, default=False, help='Enable early stopping')
+    parser.add_argument('--early_stopping', type=bool, default=True, help='Enable early stopping')
 
 
     parser.add_argument('--kernel_sizes', nargs='+', type=int, default=[2, 2, 2 ], help='List of kernel sizes for each layer')
