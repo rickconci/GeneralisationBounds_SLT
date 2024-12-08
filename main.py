@@ -172,30 +172,38 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_name', type=str, default='MNIST', choices=['MNIST', 'CIFAR10', 'ImageNet'], help='Dataset to use')
     parser.add_argument('--train_subset_fraction', type=float, default=1.0, help='Size of the training subset to use')
     parser.add_argument('--val_subset_fraction', type=float, default=1.0, help='Size of the validation subset to use')
+    parser.add_argument('--random_label_fraction', type=none_or_float, default=None, help='Fraction of labels to randomize in the training dataset. Must be between 0.0 and 1.0, or None.')
+    parser.add_argument('--noise_image_fraction', type=none_or_float, default=None, help='Fraction of noise to add to training data. Must be between 0.0 and 1.0, or None.')
     
-    parser.add_argument('--random_label_fraction', type=none_or_float, default=1.0, help='Fraction of labels to randomize in the training dataset. Must be between 0.0 (no random labels) and 1.0 (all labels randomized.)')
-    parser.add_argument('--noise_image_fraction', type=none_or_float, default=None, help='Fraction of noise to add to training data. Must be between 0.0 (no noise) and 1.0 (pure noise).')
-
-    # Model specific args
+    # Model-specific args
     parser.add_argument('--model_type', type=str, default='ModularCNN', choices=['ModularCNN', 'LegacyModels'], help='Model type to use')
     parser.add_argument('--model_name', type=str, default='AlexNet', choices=['AlexNet', 'InceptionV3'], help='Legacy model to use')
-
-    # Trainer specific args
+    
+    # Trainer-specific args
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
     parser.add_argument('--batch_size', type=int, default=2048, help='Batch size')
     parser.add_argument('--weight_decay', type=float, default=0.0001, help='Weight decay')
     parser.add_argument('--max_epochs', type=int, default=2000, help='Maximum number of epochs to train')
     
     parser.add_argument('--accelerator', type=str, default='gpu', choices=['gpu', 'mps', 'cpu', 'auto'], help='Which accelerator to use')
-
-    parser.add_argument('--log_wandb', type=bool, default=True, help='Whether to log to wandb')
-    parser.add_argument('--project_name', type=str, default='SLT_project', help='Name of the wandb project')
+    
+    # Boolean arguments with proper handling
+    parser.add_argument('--log_wandb', action='store_true', help='Enable logging to wandb')
+    parser.add_argument('--no_log_wandb', dest='log_wandb', action='store_false', help='Disable logging to wandb')
+    parser.set_defaults(log_wandb=True)
+    
+    parser.add_argument('--model_checkpoint', action='store_true', help='Enable model checkpointing')
+    parser.add_argument('--no_model_checkpoint', dest='model_checkpoint', action='store_false', help='Disable model checkpointing')
+    parser.set_defaults(model_checkpoint=False)
     parser.add_argument('--seed', type=int, default=42, help='Seed for random number generators')
-    parser.add_argument('--model_checkpoint', type=bool, default=False, help='Enable model checkpointing')
-    parser.add_argument('--early_stopping', type=bool, default=True, help='Enable early stopping')
-
-
-    parser.add_argument('--kernel_sizes', nargs='+', type=int, default=[2, 2, 2 ], help='List of kernel sizes for each layer')
+    parser.add_argument('--project_name', type=str, default='SLT_architecture_search', help='Name of the wandb project')
+    
+    parser.add_argument('--early_stopping', action='store_true', help='Enable early stopping')
+    parser.add_argument('--no_early_stopping', dest='early_stopping', action='store_false', help='Disable early stopping')
+    parser.set_defaults(early_stopping=True)
+    
+    # Architecture arguments
+    parser.add_argument('--kernel_sizes', nargs='+', type=int, default=[2, 2, 2], help='List of kernel sizes for each layer')
     parser.add_argument('--out_channels', nargs='+', type=int, default=[200, 200, 200], help='List of output channels for each layer')
     parser.add_argument('--strides', nargs='+', type=int, default=[1, 1, 1], help='List of strides for each layer')
     parser.add_argument('--paddings', nargs='+', type=int, default=[0, 0, 0], help='List of paddings for each layer')
