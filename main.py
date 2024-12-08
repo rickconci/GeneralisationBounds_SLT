@@ -169,10 +169,10 @@ if __name__ == '__main__':
     parser.add_argument('--model_name', type=str, default='AlexNet', choices=['AlexNet', 'InceptionV3'], help='Legacy model to use')
 
     # Trainer specific args
-    parser.add_argument('--lr', type=float, default=0.01, help='Learning rate')
-    parser.add_argument('--batch_size', type=int, default=4096, help='Batch size')
+    parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
+    parser.add_argument('--batch_size', type=int, default=2048, help='Batch size')
     parser.add_argument('--weight_decay', type=float, default=0.0001, help='Weight decay')
-    parser.add_argument('--max_epochs', type=int, default=400, help='Maximum number of epochs to train')
+    parser.add_argument('--max_epochs', type=int, default=800, help='Maximum number of epochs to train')
     
     parser.add_argument('--accelerator', type=str, default='gpu', choices=['gpu', 'mps', 'cpu', 'auto'], help='Which accelerator to use')
 
