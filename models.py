@@ -19,29 +19,30 @@ import csv
 from utils import max_pixel_sums, eval_rho, our_total_bound
 
 def effective_rank(tensor, epsilon=1e-12):
-    # Reshape tensor to a 2D matrix (for Conv layers, flatten spatial and input dims into one)
-    W = tensor.view(tensor.size(0), -1)
+    try:
+        # Reshape tensor to 2D
+        W = tensor.view(tensor.size(0), -1)
 
-    # Compute singular values
-    # torch.linalg.svd is preferred, but if you use older torch versions, you can use torch.svd
-    U, S, Vh = torch.linalg.svd(W, full_matrices=False)
+        # Normalize to improve numerical stability
+        W = W / W.norm(p='fro')
 
-    # Filter out very small singular values
-    S = S[S > epsilon]
-    if S.numel() == 0:
-        # If all singular values are negligible, the effective rank is 0
-        return 0.0
-    
-    # Normalize singular values to form a probability distribution
-    p = S / S.sum()
+        # Compute SVD
+        U, S, Vh = torch.linalg.svd(W, full_matrices=False)
 
-    # Compute entropy H = -sum p_i log p_i (natural log)
-    H = -torch.sum(p * torch.log(p))
+        # Filter small singular values
+        S = S[S > epsilon]
+        if S.numel() == 0:
+            return 0.0
 
-    # Effective rank = exp(H)
-    eff_rank = torch.exp(H)
-    return eff_rank
+        # Compute entropy and effective rank
+        p = S / S.sum()
+        H = -torch.sum(p * torch.log(p))
+        eff_rank = torch.exp(H)
+        return eff_rank
 
+    except torch._C._LinAlgError as e:
+        print("SVD failed:", e)
+        return 0.0  # Fallback rank
 
 class SparseDeepModel(LightningModule):
     def __init__(self, model_name, num_classes, lr, weight_decay):
@@ -414,133 +415,3 @@ class ModularCNN(LightningModule):
             writer = csv.writer(f)
             writer.writerow(header)
         self.csv_header_written = True
-
-
-
-def simulate_model_dimensions(kernel_sizes, out_channels, strides, paddings, 
-                              pool_sizes, input_dims, dataset_name="MNIST"):
-    """
-    Simulates the dimensions of the data as it passes through the model layers.
-    
-    Args:
-        kernel_sizes (list): List of kernel sizes for the convolutional layers.
-        out_channels (list): List of output channels for the convolutional layers.
-        strides (list): List of strides for the convolutional layers.
-        paddings (list): List of paddings for the convolutional layers.
-        pool_sizes (list): List of pooling sizes for max pooling layers.
-        input_dims (tuple): A tuple (height, width, channels) representing the input dimensions.
-        dataset_name (str): Name of the dataset (e.g., "MNIST", "CIFAR10").
-    """
-    # Adjust input channels based on dataset
-    if dataset_name == "CIFAR10":
-        in_channels = 3
-        h, w = 32, 32  # CIFAR-10 images are 32x32
-    elif dataset_name == "MNIST":
-        in_channels = 1
-        h, w = 28, 28  # MNIST images are 28x28
-    else:
-        h, w, in_channels = input_dims  # Default dimensions if provided explicitly
-
-    print(f"Dataset: {dataset_name}")
-    print(f"Input Dimensions: Height={h}, Width={w}, Channels={in_channels}\n")
-    
-    num_layers = max(len(kernel_sizes), len(pool_sizes))
-    
-    for layer_idx in range(num_layers):
-        print(f"Layer {layer_idx}:")
-        
-        # Convolutional Layer
-        if layer_idx < len(kernel_sizes):
-            kernel_size = kernel_sizes[layer_idx]
-            out_channel = out_channels[layer_idx]
-            stride = strides[layer_idx]
-            padding = paddings[layer_idx]
-            
-            # Compute output dimensions after convolution
-            h_out = (h + 2 * padding - kernel_size) // stride + 1
-            w_out = (w + 2 * padding - kernel_size) // stride + 1
-            
-            print(f"  Conv2d: kernel_size={kernel_size}, stride={stride}, padding={padding}")
-            print(f"    Input Channels: {in_channels}")
-            print(f"    Output Channels: {out_channel}")
-            print(f"    Output Dimensions: Height={h_out}, Width={w_out}")
-            
-            # Update dimensions and channels for next layer
-            h, w = h_out, w_out
-            in_channels = out_channel
-            
-        print("")  # Empty line for readability
-    
-    # After all layers
-    num_flat_features = in_channels * h * w
-    print(f"Final Output Dimensions before Linear Layer: {num_flat_features}")
-    
-    if num_flat_features <= 0:
-        print("Error: The number of features before the linear layer is non-positive.")
-        print("Possible causes:")
-        print("  - The dimensions have been reduced too much due to convolution or pooling.")
-        print("  - Incorrect padding, stride, or kernel sizes leading to zero or negative dimensions.")
-    else:
-        print("The dimensions are valid for the linear layer input.")
-
-    return num_flat_features
-
-
-
-def calculate_total_params(args, input_size=(28, 28), num_classes=10):
-    in_channels = 1  # MNIST images are grayscale
-    total_params = 0
-    current_height, current_width = input_size
-
-    # Calculate parameters for convolutional layers
-    for i in range(len(args.kernel_sizes)):
-        kernel_size = args.kernel_sizes[i]
-        out_channels = args.out_channels[i]
-        stride = args.strides[i]
-        padding = args.paddings[i]
-
-        # Parameters: (kernel_size * kernel_size * in_channels + 1) * out_channels
-        conv_params = (kernel_size * kernel_size * in_channels + 1) * out_channels
-        total_params += conv_params
-
-        # Update feature map size
-        current_height = math.floor((current_height + 2 * padding - kernel_size) / stride) + 1
-        current_width = math.floor((current_width + 2 * padding - kernel_size) / stride) + 1
-
-        # Update in_channels for next layer
-        in_channels = out_channels
-
-    # Parameters for the fully connected layer
-    fc_input_size = current_height * current_width * in_channels
-    fc_params = (fc_input_size + 1) * num_classes  # +1 for bias
-    total_params += fc_params
-
-    return total_params
-
-
-
-def create_kernel_dict(kernel_sizes, out_channels, strides, paddings):
-    """
-    Converts lists of kernel parameters into a kernel_dict structure.
-
-    Args:
-        kernel_sizes (list): List of kernel sizes for each layer.
-        out_channels (list): List of output channels for each layer.
-        strides (list): List of strides for each layer.
-        paddings (list): List of paddings for each layer.
-
-    Returns:
-        dict: A dictionary with layer indices as keys and kernel parameters as values.
-    """
-    kernel_dict = {}
-    num_layers = len(kernel_sizes)
-    
-    for i in range(num_layers):
-        kernel_dict[i] = {
-            'kernel_size': kernel_sizes[i],
-            'out_channels': out_channels[i],
-            'stride': strides[i],
-            'padding': paddings[i],
-        }
-    
-    return kernel_dict

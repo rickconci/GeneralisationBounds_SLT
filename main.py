@@ -16,7 +16,9 @@ from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.profilers import SimpleProfiler, AdvancedProfiler
 
 from data import DataModule
-from models import SparseDeepModel, ModularCNN, simulate_model_dimensions, calculate_total_params, create_kernel_dict
+from models import SparseDeepModel, ModularCNN
+from utils import none_or_float, simulate_model_dimensions, calculate_total_params, create_kernel_dict
+
 
 wandb.login(key = '3c5767e934e3aa77255fc6333617b6e0a2aab69f')
 
@@ -159,8 +161,8 @@ if __name__ == '__main__':
     parser.add_argument('--train_subset_fraction', type=float, default=1.0, help='Size of the training subset to use')
     parser.add_argument('--val_subset_fraction', type=float, default=1.0, help='Size of the validation subset to use')
     
-    parser.add_argument('--random_label_fraction', type=float, default=None, help='Fraction of labels to randomize in the training dataset. Must be between 0.0 (no random labels) and 1.0 (all labels randomized.)')
-    parser.add_argument('--noise_image_fraction', type=float, default=None, help='Fraction of noise to add to training data. Must be between 0.0 (no noise) and 1.0 (pure noise).')
+    parser.add_argument('--random_label_fraction', type=none_or_float, default=None, help='Fraction of labels to randomize in the training dataset. Must be between 0.0 (no random labels) and 1.0 (all labels randomized.)')
+    parser.add_argument('--noise_image_fraction', type=none_or_float, default=None, help='Fraction of noise to add to training data. Must be between 0.0 (no noise) and 1.0 (pure noise).')
 
     # Model specific args
     parser.add_argument('--model_type', type=str, default='ModularCNN', choices=['ModularCNN', 'LegacyModels'], help='Model type to use')
@@ -200,7 +202,7 @@ if __name__ == '__main__':
         num_classes = 1000
 
     calculate_total_params(args, input_dims=input_dims, num_classes=num_classes)
-    simulate_model_dimensions(args.kernel_sizes, args.out_channels, args.strides, args.paddings, input_dims=input_dims)
+    simulate_model_dimensions(args.kernel_sizes, args.out_channels, args.strides, args.paddings, input_dims, args.dataset_name)
     
     
     main(args)

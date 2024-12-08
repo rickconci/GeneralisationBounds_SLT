@@ -11,6 +11,9 @@ cd into home folder
 cd into the project folder
 `conda env create -f env.yaml`
 
+switch to correct branch
+`git checkout <branch_name>`
+
 env composed of:
 `conda create -n SLT python=3.10`
 `conda activate SLT`
