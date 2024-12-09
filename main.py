@@ -211,23 +211,30 @@ if __name__ == '__main__':
     # Model-specific args
     parser.add_argument('--model_type', type=str, default='ModularCNN', choices=['ModularCNN', 'LegacyModels'], help='Model type to use')
     parser.add_argument('--model_name', type=str, default='AlexNet', choices=['AlexNet', 'InceptionV3'], help='Legacy model to use')
+    
+    # Architecture arguments
+    parser.add_argument('--kernel_sizes', nargs='+', type=int, default=[2, 2, 2], help='List of kernel sizes for each layer')
+    parser.add_argument('--out_channels', nargs='+', type=int, default=[200,200, 200], help='List of output channels for each layer')
+    parser.add_argument('--strides', nargs='+', type=int, default=[1, 1, 1], help='List of strides for each layer')
+    parser.add_argument('--paddings', nargs='+', type=int, default=[0, 0, 0], help='List of paddings for each layer')
+   
     parser.add_argument('--weight_init', action='store_true', help='Enable weight initialization')
     parser.add_argument('--no_weight_init', dest='weight_init', action='store_false', help='Disable weight initialization')
-    parser.set_defaults(weight_init=True)
+    parser.set_defaults(weight_init=False)
     
     # Trainer-specific args
-    parser.add_argument('--batch_size', type=int, default=1248, help='Batch size')
+    parser.add_argument('--batch_size', type=int, default=32, help='Batch size')
     parser.add_argument('--max_epochs', type=int, default=2000, help='Maximum number of epochs to train')
     
-    parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
+    parser.add_argument('--lr', type=float, default=0.01, help='Learning rate')
     parser.add_argument('--optimizer_choice', type=str, default='SGD', choices=['SGD', 'AdamW'], help='Optimizer to use')
-    parser.add_argument('--momentum', type=float, default=0, help='Momentum')
+    parser.add_argument('--weight_decay', type=float, default=8e-4, help='Weight decay')
+
+    parser.add_argument('--momentum', type=float, default=0.0, help='Momentum')
     parser.add_argument('--use_warmup', action='store_true', help='Enable lr warmup')
     parser.add_argument('--no_use_warmup', dest='use_warmup', action='store_false', help='Disable lr warmup')
     parser.set_defaults(use_warmup=False)
-    parser.add_argument('--lr_decay_type', type=str, default='cosine', choices=['cosine', 'linear', 'no_decay'], help='Type of lr decay to use')    
-    
-    parser.add_argument('--weight_decay', type=float, default=0.003, help='Weight decay')
+    parser.add_argument('--lr_decay_type', type=str, default='multi_step', choices=['multi_step', 'cosine', 'linear'], help='Type of lr decay to use')    
 
     
     # Boolean arguments with proper handling
@@ -240,6 +247,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_checkpoint', action='store_true', help='Enable model checkpointing')
     parser.add_argument('--no_model_checkpoint', dest='model_checkpoint', action='store_false', help='Disable model checkpointing')
     parser.set_defaults(model_checkpoint=False)
+
     parser.add_argument('--seed', type=int, default=42, help='Seed for random number generators')
     parser.add_argument('--project_name', type=str, default='SLT_experiments_1', help='Name of the wandb project')
     
@@ -247,12 +255,7 @@ if __name__ == '__main__':
     parser.add_argument('--no_early_stopping', dest='early_stopping', action='store_false', help='Disable early stopping')
     parser.set_defaults(early_stopping=True)
     
-    # Architecture arguments
-    parser.add_argument('--kernel_sizes', nargs='+', type=int, default=[3, 2, 2], help='List of kernel sizes for each layer')
-    parser.add_argument('--out_channels', nargs='+', type=int, default=[128, 256, 512], help='List of output channels for each layer')
-    parser.add_argument('--strides', nargs='+', type=int, default=[2, 2, 2], help='List of strides for each layer')
-    parser.add_argument('--paddings', nargs='+', type=int, default=[0, 0, 0], help='List of paddings for each layer')
-    
+     
     args = parser.parse_args()
 
 

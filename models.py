@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torchvision
 from torch.nn.utils.parametrizations import weight_norm
 import torchvision.transforms as transforms
 import torchvision.models as models
@@ -10,7 +9,7 @@ from lightning import LightningModule
 import math
 import numpy as np
 from torch.optim.lr_scheduler import LambdaLR
-from torch.optim.lr_scheduler import _LRScheduler
+from torch.optim.lr_scheduler import MultiStepLR
 import torch.nn.init as init
 import math
 import os
@@ -148,8 +147,6 @@ class SparseDeepModel(LightningModule):
         optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
         return optimizer
 
-
-
 class ModularCNN(LightningModule):
     def __init__(self, kernel_dict, max_pool_layer_dict, dropout_layer_dict, num_classes, 
                  weight_decay, 
@@ -209,7 +206,7 @@ class ModularCNN(LightningModule):
                     padding=padding
                 )
                 layers.append(conv_layer)
-                conv_layer = weight_norm(conv_layer)
+                conv_layer = weight_norm(conv_layer, dim=None)
                 layers.append(nn.ReLU(inplace=True))
 
                 # Update spatial dimensions
@@ -401,7 +398,7 @@ class ModularCNN(LightningModule):
             optimizer = torch.optim.SGD(
                 self.model.parameters(),
                 lr=self.lr,
-                momentum=self.momentum if self.use_momentum else 0,
+                momentum=self.momentum,
                 weight_decay=self.weight_decay
             )
         elif self.optimizer_choice == 'AdamW':
@@ -414,28 +411,44 @@ class ModularCNN(LightningModule):
             raise ValueError("Unsupported optimizer choice. Use 'SGD' or 'AdamW'.")
 
         # Define lr_lambda function combining warmup and decay
-        def lr_lambda(current_step):
-            if self.use_warmup and current_step < self.warmup_steps:
-                return current_step / self.warmup_steps
-            else:
-                progress = (current_step - self.warmup_steps) / (self.max_steps - self.warmup_steps)
-                if self.lr_decay_type == 'cosine':
-                    return 0.5 * (1 + math.cos(math.pi * progress))
-                elif self.lr_decay_type == 'linear':
-                    return max(0.0, 1 - progress)
-                elif self.lr_decay_type == 'no_decay':
-                    return 1.0  # No decay
-                else:
-                    raise ValueError("Unsupported lr decay type. Use 'cosine', 'linear', or 'no_decay'.")
-
-        scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": {
+        if self.lr_decay_type == 'multi_step':
+            scheduler = MultiStepLR(
+                optimizer,
+                milestones=[60, 100, 300],
+                gamma=0.2
+            )
+            scheduler_config = {
                 "scheduler": scheduler,
-                "interval": "step",
+                "interval": "epoch",  # 'epoch' or 'step' based on your needs
+                "frequency": 1,
+                "name": "MultiStepLR"
+            }
+        else:
+            # Handle other lr_decay_types if necessary
+            def lr_lambda(current_step):
+                if self.use_warmup and current_step < self.warmup_steps:
+                    return current_step / self.warmup_steps
+                else:
+                    progress = (current_step - self.warmup_steps) / (self.max_steps - self.warmup_steps)
+                    if self.lr_decay_type == 'cosine':
+                        return 0.5 * (1 + math.cos(math.pi * progress))
+                    elif self.lr_decay_type == 'linear':
+                        return max(0.0, 1 - progress)
+                    elif self.lr_decay_type == 'no_decay':
+                        return 1.0  # No decay
+                    else:
+                        raise ValueError("Unsupported lr decay type. Use 'cosine', 'linear', 'no_decay', or 'multi_step'.")
+
+            scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
+            scheduler_config = {
+                "scheduler": scheduler,
+                "interval": "step",  # 'epoch' or 'step' based on your needs
                 "frequency": 1
             }
+
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": scheduler_config
         }
     
     def on_fit_start(self):

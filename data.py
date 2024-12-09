@@ -49,7 +49,7 @@ class DataModule(L.LightningDataModule):
             self.num_classes = 10
             self.transform = transforms.Compose([
                 transforms.ToTensor(),
-                transforms.Normalize((0.5,), (0.5,))  # Normalize grayscale images
+                transforms.Normalize(0.1307, 0.3081)  # Normalize grayscale images
             ])
 
     @property

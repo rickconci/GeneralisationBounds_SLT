@@ -24,3 +24,9 @@ for GPU killing:
 
 Currently trying to run it with the following command:
 `python3 main.py`
+
+--
+
+Questions:
+
+- code says multi_step gamma is 0.2, but in the readme it is 0.1.
