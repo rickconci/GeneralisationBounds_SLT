@@ -10,6 +10,7 @@ from lightning import LightningModule
 import math
 import numpy as np
 from torch.optim.lr_scheduler import LambdaLR
+from torch.optim.lr_scheduler import _LRScheduler
 import torch.nn.init as init
 import math
 import os
@@ -150,7 +151,11 @@ class SparseDeepModel(LightningModule):
 
 
 class ModularCNN(LightningModule):
-    def __init__(self, kernel_dict, max_pool_layer_dict, dropout_layer_dict, num_classes, lr, weight_decay, warmup_steps=50, max_steps=200):
+    def __init__(self, kernel_dict, max_pool_layer_dict, dropout_layer_dict, num_classes, 
+                 weight_decay, 
+                 lr, optimizer_choice, momentum,  
+                 use_warmup, lr_decay_type, warmup_steps, max_steps,
+                 weight_init=True):
         super(ModularCNN, self).__init__()
         # implement model with N number of Conv2d layers followed by potential maxpooling layers, relu activations, dropout layers, and one single final linear layer
         # input size is always 28x28
@@ -160,12 +165,20 @@ class ModularCNN(LightningModule):
 
         self.lr = lr
         self.weight_decay = weight_decay
+        self.optimizer_choice = optimizer_choice
+        self.momentum = momentum
+        
+        self.use_warmup = use_warmup
+
+        self.lr_decay_type = lr_decay_type
         self.warmup_steps = warmup_steps
         self.max_steps = max_steps
-        self.num_classes = num_classes
 
         self.kernel_dict = kernel_dict
+        self.num_classes = num_classes
         self.max_pixel_sum = None
+
+        self.weight_init = weight_init
 
         # Assuming grayscale images; change to 3 if using RGB images
         in_channels = 1
@@ -241,7 +254,8 @@ class ModularCNN(LightningModule):
         self.csv_file_path = os.path.join("csv_files", "layer_stats.csv")
         self.csv_header_written = False
 
-        self.apply(self._init_weights)  # Apply weight initialization
+        if self.weight_init:
+            self.apply(self._init_weights)  # Apply weight initialization
 
     def _init_weights(self, module):
         """
@@ -382,24 +396,45 @@ class ModularCNN(LightningModule):
         return loss
 
     def configure_optimizers(self):
-        # Define the optimizer
-        optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
-        
-        # Define the scheduler with cosine decay and warm-up
+        # Choose optimizer based on self.optimizer_choice
+        if self.optimizer_choice == 'SGD':
+            optimizer = torch.optim.SGD(
+                self.model.parameters(),
+                lr=self.lr,
+                momentum=self.momentum if self.use_momentum else 0,
+                weight_decay=self.weight_decay
+            )
+        elif self.optimizer_choice == 'AdamW':
+            optimizer = torch.optim.AdamW(
+                self.model.parameters(),
+                lr=self.lr,
+                weight_decay=self.weight_decay
+            )
+        else:
+            raise ValueError("Unsupported optimizer choice. Use 'SGD' or 'AdamW'.")
+
+        # Define lr_lambda function combining warmup and decay
         def lr_lambda(current_step):
-            if current_step < self.warmup_steps:
+            if self.use_warmup and current_step < self.warmup_steps:
                 return current_step / self.warmup_steps
-            cosine_decay = 0.5 * (1 + math.cos(math.pi * (current_step - self.warmup_steps) / (self.max_steps - self.warmup_steps)))
-            return cosine_decay
+            else:
+                progress = (current_step - self.warmup_steps) / (self.max_steps - self.warmup_steps)
+                if self.lr_decay_type == 'cosine':
+                    return 0.5 * (1 + math.cos(math.pi * progress))
+                elif self.lr_decay_type == 'linear':
+                    return max(0.0, 1 - progress)
+                elif self.lr_decay_type == 'no_decay':
+                    return 1.0  # No decay
+                else:
+                    raise ValueError("Unsupported lr decay type. Use 'cosine', 'linear', or 'no_decay'.")
 
         scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
-        
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": scheduler,
-                "interval": "step",  # Adjust every step
-                "frequency": 1       # Apply every step
+                "interval": "step",
+                "frequency": 1
             }
         }
     

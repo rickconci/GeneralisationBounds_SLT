@@ -115,8 +115,15 @@ def main(args):
                            num_classes= data_module.num_classes, 
                            lr=args.lr, 
                            weight_decay=args.weight_decay, 
+                           optimizer_choice=args.optimizer_choice, 
+                           momentum=args.momentum, 
+                           use_warmup=args.use_warmup, 
+                           lr_decay_type=args.lr_decay_type, 
                            warmup_steps = args.max_epochs/5, 
-                           max_steps = args.max_epochs)
+                           max_steps = args.max_epochs,
+                           weight_init=args.weight_init)
+        
+        
         
     elif args.model_type == 'LegacyModels':
         model = SparseDeepModel(model_name=args.model_name, 
@@ -204,16 +211,28 @@ if __name__ == '__main__':
     # Model-specific args
     parser.add_argument('--model_type', type=str, default='ModularCNN', choices=['ModularCNN', 'LegacyModels'], help='Model type to use')
     parser.add_argument('--model_name', type=str, default='AlexNet', choices=['AlexNet', 'InceptionV3'], help='Legacy model to use')
+    parser.add_argument('--weight_init', action='store_true', help='Enable weight initialization')
+    parser.add_argument('--no_weight_init', dest='weight_init', action='store_false', help='Disable weight initialization')
+    parser.set_defaults(weight_init=True)
     
     # Trainer-specific args
-    parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
     parser.add_argument('--batch_size', type=int, default=1248, help='Batch size')
-    parser.add_argument('--weight_decay', type=float, default=0.0001, help='Weight decay')
     parser.add_argument('--max_epochs', type=int, default=2000, help='Maximum number of epochs to train')
     
-    parser.add_argument('--accelerator', type=str, default='gpu', choices=['gpu', 'mps', 'cpu', 'auto'], help='Which accelerator to use')
+    parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
+    parser.add_argument('--optimizer_choice', type=str, default='SGD', choices=['SGD', 'AdamW'], help='Optimizer to use')
+    parser.add_argument('--momentum', type=float, default=0, help='Momentum')
+    parser.add_argument('--use_warmup', action='store_true', help='Enable lr warmup')
+    parser.add_argument('--no_use_warmup', dest='use_warmup', action='store_false', help='Disable lr warmup')
+    parser.set_defaults(use_warmup=False)
+    parser.add_argument('--lr_decay_type', type=str, default='cosine', choices=['cosine', 'linear', 'no_decay'], help='Type of lr decay to use')    
+    
+    parser.add_argument('--weight_decay', type=float, default=0.003, help='Weight decay')
+
     
     # Boolean arguments with proper handling
+    parser.add_argument('--accelerator', type=str, default='gpu', choices=['gpu', 'mps', 'cpu', 'auto'], help='Which accelerator to use')
+
     parser.add_argument('--log_wandb', action='store_true', help='Enable logging to wandb')
     parser.add_argument('--no_log_wandb', dest='log_wandb', action='store_false', help='Disable logging to wandb')
     parser.set_defaults(log_wandb=True)

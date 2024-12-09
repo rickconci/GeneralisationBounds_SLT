@@ -2,17 +2,9 @@
 
 ## environment
 
-cd into home folder
-`curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh`
-`sh Miniconda3-latest-Linux-x86_64.sh`
-`source ~/.bashrc`
-`conda config --set auto_activate_base false`
-
-cd into the project folder
 `git clone https://github.com/rickconci/GeneralisationBounds_SLT.git`
 `cd GeneralisationBounds_SLT`
-`git switch GPU-testing`
-`conda env create -f env.yaml`
+`. setup.sh`
 
 env composed of:
 `conda create -n SLT python=3.10`
@@ -24,6 +16,9 @@ env composed of:
 
 for GPU monitoring:
 `gpustat --watch`
+
+for GPU killing:
+`nvidia-smi | grep 'python' | awk '{print $5}' | xargs -r kill -9`
 
 ## run the code
 

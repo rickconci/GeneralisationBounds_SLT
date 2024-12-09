@@ -55,8 +55,11 @@ slots_per_gpu=2  # Adjust this value as needed
 
 # Initialize an associative array to keep track of PIDs per GPU
 declare -A gpu_pids
+
 for gpu_id in "${gpus[@]}"; do
-    gpu_pids[$gpu_id]=""
+    # Get the PIDs of processes running on this GPU
+    pids=($(nvidia-smi --query-compute-apps=pid --format=csv,noheader,nounits --id=$gpu_id))
+    gpu_pids[$gpu_id]="${pids[@]}"
 done
 
 for ((i = 0; i < num_combinations; i++)); do
@@ -83,6 +86,7 @@ for ((i = 0; i < num_combinations; i++)); do
         fi
         sleep 1  # Wait for a second before checking again
     done
+
 
     # Get hyperparameters
     IFS='|' read -r random_label_fraction lr batch_size kernel_sizes strides paddings out_channels <<< "${combinations[$i]}"
@@ -119,6 +123,8 @@ for ((i = 0; i < num_combinations; i++)); do
     pid=$!
     # Add pid to gpu_pids
     gpu_pids[$gpu_id]="${gpu_pids[$gpu_id]} $pid"
+    echo "Downloading data files..."
+    sleep 10
 done
 
 # Wait for all jobs to finish
