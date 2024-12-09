@@ -14,7 +14,6 @@ cd into the project folder
 `git switch GPU-testing`
 `conda env create -f env.yaml`
 
-
 env composed of:
 `conda create -n SLT python=3.10`
 `conda activate SLT`

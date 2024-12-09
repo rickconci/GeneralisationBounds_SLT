@@ -383,7 +383,7 @@ class ModularCNN(LightningModule):
 
     def configure_optimizers(self):
         # Define the optimizer
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
         
         # Define the scheduler with cosine decay and warm-up
         def lr_lambda(current_step):

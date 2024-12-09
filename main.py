@@ -18,7 +18,30 @@ from lightning.pytorch.profilers import SimpleProfiler, AdvancedProfiler
 from data import DataModule
 from models import SparseDeepModel, ModularCNN
 from utils import none_or_float, simulate_model_dimensions, calculate_total_params, create_kernel_dict, max_pixel_sums
+from lightning.pytorch.callbacks import Callback
 
+class CustomEarlyStopping(Callback):
+    def __init__(self, target_accuracy=0.95, max_epochs=3000):
+        '''
+        Custom early stopping callback.
+        Args:
+            target_accuracy (float): Training will stop when this accuracy is reached.
+            max_epochs (int): Maximum number of epochs to train if target accuracy is not reached.
+        '''
+        self.target_accuracy = target_accuracy
+    def on_train_epoch_end(self, trainer, pl_module):
+        '''
+        Called at the end of each training epoch.
+        Args:
+            trainer: The Lightning Trainer.
+            pl_module: The LightningModule (your model).
+        '''
+        # Get the logged training accuracy
+        train_acc = trainer.callback_metrics.get('train_acc', None)
+        # Stop training if target accuracy is reached
+        if train_acc is not None and train_acc >= self.target_accuracy:
+            print(f'Training stopped early as training accuracy reached {train_acc:.4f}.')
+            trainer.should_stop = True
 
 wandb.login(key = '3c5767e934e3aa77255fc6333617b6e0a2aab69f')
 
@@ -143,20 +166,23 @@ def main(args):
     # Pass max_pixel_sum to the trainer (using LightningModule's `configure_optimizers`)
     model.max_pixel_sum = max_pixel_sum
 
+    # Define the custom early stopping callback
+    early_stopping_callback = CustomEarlyStopping(target_accuracy=0.99)
+    
     trainer = Trainer(
         max_epochs=args.max_epochs,
         accelerator=args.accelerator,
         logger=wandb_logger,
         log_every_n_steps=5,
-        callbacks=callbacks,
+        callbacks=callbacks + [early_stopping_callback],
         #fast_dev_run = True,
         #overfit_batches = 1
         #deterministic=True,
         #check_val_every_n_epoch=1,
-        devices=1, 
-        #strategy="ddp",
+        devices=1,
+        #strategy=“ddp”,
         accumulate_grad_batches=6,
-        profiler="simple"   #this helps to identify bottlenecks 
+        profiler='simple'   #this helps to identify bottlenecks
     )
     trainer.fit(model, data_module)
 
@@ -181,7 +207,7 @@ if __name__ == '__main__':
     
     # Trainer-specific args
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
-    parser.add_argument('--batch_size', type=int, default=2048, help='Batch size')
+    parser.add_argument('--batch_size', type=int, default=1248, help='Batch size')
     parser.add_argument('--weight_decay', type=float, default=0.0001, help='Weight decay')
     parser.add_argument('--max_epochs', type=int, default=2000, help='Maximum number of epochs to train')
     
@@ -196,16 +222,16 @@ if __name__ == '__main__':
     parser.add_argument('--no_model_checkpoint', dest='model_checkpoint', action='store_false', help='Disable model checkpointing')
     parser.set_defaults(model_checkpoint=False)
     parser.add_argument('--seed', type=int, default=42, help='Seed for random number generators')
-    parser.add_argument('--project_name', type=str, default='SLT_architecture_search', help='Name of the wandb project')
+    parser.add_argument('--project_name', type=str, default='SLT_experiments_1', help='Name of the wandb project')
     
     parser.add_argument('--early_stopping', action='store_true', help='Enable early stopping')
     parser.add_argument('--no_early_stopping', dest='early_stopping', action='store_false', help='Disable early stopping')
     parser.set_defaults(early_stopping=True)
     
     # Architecture arguments
-    parser.add_argument('--kernel_sizes', nargs='+', type=int, default=[2, 2, 2], help='List of kernel sizes for each layer')
-    parser.add_argument('--out_channels', nargs='+', type=int, default=[200, 200, 200], help='List of output channels for each layer')
-    parser.add_argument('--strides', nargs='+', type=int, default=[1, 1, 1], help='List of strides for each layer')
+    parser.add_argument('--kernel_sizes', nargs='+', type=int, default=[3, 2, 2], help='List of kernel sizes for each layer')
+    parser.add_argument('--out_channels', nargs='+', type=int, default=[128, 256, 512], help='List of output channels for each layer')
+    parser.add_argument('--strides', nargs='+', type=int, default=[2, 2, 2], help='List of strides for each layer')
     parser.add_argument('--paddings', nargs='+', type=int, default=[0, 0, 0], help='List of paddings for each layer')
     
     args = parser.parse_args()
