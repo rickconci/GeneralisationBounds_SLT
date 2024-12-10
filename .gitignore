@@ -6,3 +6,7 @@ SLT_project_output
 *.txt
 __pycache__/
 data/
+Plotting_pickles/
+*.ipynb
+colab/
+plotting.py

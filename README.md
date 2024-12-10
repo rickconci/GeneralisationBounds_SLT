@@ -2,11 +2,19 @@
 
 ## environment
 
+**Download and install Miniconda**
+`curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh`
+`sh Miniconda3-latest-Linux-x86_64.sh -b`  # -b flag to install without prompts
+`source ~/.bashrc`
+`conda config --set auto_activate_base false`
+
+**Clone the repository**
 `git clone https://github.com/rickconci/GeneralisationBounds_SLT.git`
 `cd GeneralisationBounds_SLT`
-`. setup.sh`
+`git switch GPU-testing`
+`sh setup.sh`
 
-env composed of:
+**env composed of:**
 `conda create -n SLT python=3.10`
 `conda activate SLT`
 `conda install pytorch torchvision torchaudio pytorch-cuda=12.4 -c pytorch -c nvidia`
@@ -14,15 +22,13 @@ env composed of:
 `conda install conda-forge::wandb`
 `pip install gpustat`
 
-for GPU monitoring:
+**for GPU monitoring:**
 `gpustat --watch`
 
-for GPU killing:
+**for GPU killing:**
 `nvidia-smi | grep 'python' | awk '{print $5}' | xargs -r kill -9`
 
-## run the code
-
-Currently trying to run it with the following command:
+**Run it with the following command:**
 `python3 main.py`
 
 --

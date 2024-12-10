@@ -106,34 +106,35 @@ def max_pixel_sums(dataset_name):
     Compute the maximum pixel sum for squared images in the dataset by iterating over each image.
 
     Args:
-        dataset: PyTorch Dataset object.
+        dataset_name (str): Name of the dataset.
 
     Returns:
         float: Maximum sum of squared pixels across all images in the dataset.
     """
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Force everything to stay on the CPU
+    device = torch.device("cpu")
+    
     if dataset_name == "MNIST":
         dataset = torchvision.datasets.MNIST(root='./data', train=True, download=True)
     else:
         raise ValueError(f"Unsupported dataset: {dataset_name}")
     
+    # Get the size of a single image
     image, _ = dataset[0]
     image_tensor = torchvision.transforms.functional.to_tensor(image)
     image_size = image_tensor.size()
 
-    # Initialize a tensor to hold the pixel sums
+    # Initialize a tensor to hold the pixel sums on the CPU
     pixel_sums = torch.zeros(image_size, device=device)
 
-    # Loop over all images in the dataset and add their pixels to the sums
+    # Loop over all images in the dataset and add their squared pixels to the sums
     for i in range(len(dataset)):
         image, _ = dataset[i]
         image_tensor = torchvision.transforms.functional.to_tensor(image)
         pixel_sums += torch.pow(image_tensor, 2)
 
-    # Return the tensor of pixel sums
+    # Return the maximum pixel sum
     return pixel_sums.max().item()
-
 
 def eval_rho(net):
     """

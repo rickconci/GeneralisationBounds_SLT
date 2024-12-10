@@ -130,12 +130,12 @@ def main(args):
         )
         callbacks.append(checkpoint_callback)
 
-    if args.early_stopping:
+    if args.early_stopping and args.random_label_fraction is None:
         early_stopping = EarlyStopping(
             min_delta=0.00,
-            monitor='train_acc',        # Ensure this is the exact name used in your logging
-            patience=50,                    # num epochs with a val loss not improving before it stops 
-            mode='max',                     # Minimize the monitored value
+            monitor='train_acc',
+            patience=50,
+            mode='max',
             verbose=True
         )
         callbacks.append(early_stopping)

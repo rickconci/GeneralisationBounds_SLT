@@ -6,8 +6,12 @@ cd ..
 # Download and install Miniconda
 echo "Downloading and installing Miniconda..."
 curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-sh Miniconda3-latest-Linux-x86_64.sh -b  # -b flag to install without prompts
-source ~/.bashrc
+sh Miniconda3-latest-Linux-x86_64.sh
+
+# Initialize Miniconda
+echo "Initializing Miniconda..."
+export PATH=$HOME/miniconda3/bin:$PATH
+source $HOME/miniconda3/bin/activate
 
 # Configure Conda
 echo "Configuring Conda..."

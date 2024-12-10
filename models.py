@@ -410,8 +410,7 @@ class ModularCNN(LightningModule):
         self.csv_header_written = True
     '''
     
-    def on_epoch_end(self):
-        n = 10
+    def on_train_epoch_end(self):
         # Ensure self.trainer and self.hparams are accessible
         if self.trainer.datamodule and self.hparams:
             # Access the training dataloader
@@ -419,39 +418,39 @@ class ModularCNN(LightningModule):
             num_classes = self.hparams.num_classes
             dataset_size = len(data_loader.dataset)
             depth = len([layer for layer in self.model.modules() if isinstance(layer, (torch.nn.Conv2d, torch.nn.Linear))])
-
+    
             # Compute the generalization bound using the utility function
             bound, mult1, mult2, mult3, add1 = our_total_bound(self, num_classes, dataset_size, depth, self.kernel_dict, self.max_pixel_sum)
-
+    
             # Log the bound as before
-            self.log("generalization_bound", bound, prog_bar=True)
-
+            self.log("generalization_bound", bound, on_epoch=True, on_step=False, prog_bar=True)
+    
             # Log the intermediate values to a "folder" named "bound_components" in W&B
-            self.log("bound_components/mult1", mult1, prog_bar=False)
-            self.log("bound_components/mult2", mult2, prog_bar=False)
-            self.log("bound_components/mult3", mult3, prog_bar=False)
-            self.log("bound_components/add1", add1, prog_bar=False)
+            self.log("bound_components/mult1", mult1, on_epoch=True, on_step=False, prog_bar=False)
+            self.log("bound_components/mult2", mult2, on_epoch=True, on_step=False, prog_bar=False)
+            self.log("bound_components/mult3", mult3, on_epoch=True, on_step=False, prog_bar=False)
+            self.log("bound_components/add1", add1, on_epoch=True, on_step=False, prog_bar=False)
         
+            if self.current_epoch % 5 == 0:
+                # Iterate over all Conv2d/Linear layers and log their Frobenius norms and ranks
+                layer_idx = 0
+                for layer in self.model.modules():
+                    if isinstance(layer, (nn.Conv2d, nn.Linear)):
+                        w = layer.weight
+                        # Frobenius norm of the weight matrix
+                        fro_norm = torch.norm(w, p='fro')
+
+                        # Compute rank: reshape weight to a 2D matrix and compute matrix rank
+                        w_matrix = w.view(w.size(0), -1)
+                        rank = effective_rank(w_matrix)
+
+                        # Log these values
+                        # Using a consistent naming scheme groups them in W&B:
+                        # "weight_fro_norm/layer_0", "weight_fro_norm/layer_1", etc.
+                        self.log(f"weight_fro_norm/layer_{layer_idx}", fro_norm, on_step=True, on_epoch=False)
+                        self.log(f"weight_ranks/layer_{layer_idx}", rank, on_step=True, on_epoch=False)
+                        layer_idx += 1
         '''
-        if self.current_epoch % n == 0:
-            # Iterate over all Conv2d/Linear layers and log their Frobenius norms and ranks
-            layer_idx = 0
-            for layer in self.model.modules():
-                if isinstance(layer, (nn.Conv2d, nn.Linear)):
-                    w = layer.weight
-                    # Frobenius norm of the weight matrix
-                    fro_norm = torch.norm(w, p='fro')
-
-                    # Compute rank: reshape weight to a 2D matrix and compute matrix rank
-                    w_matrix = w.view(w.size(0), -1)
-                    rank = effective_rank(w_matrix)
-
-                    # Log these values
-                    # Using a consistent naming scheme groups them in W&B:
-                    # "weight_fro_norm/layer_0", "weight_fro_norm/layer_1", etc.
-                    self.log(f"weight_fro_norm/layer_{layer_idx}", fro_norm, on_step=True, on_epoch=False)
-                    self.log(f"weight_ranks/layer_{layer_idx}", rank, on_step=True, on_epoch=False)
-                    layer_idx += 1
 
             # Compute Frobenius norm and effective rank for each layer
             norms = []
@@ -462,7 +461,7 @@ class ModularCNN(LightningModule):
                 eff_r = effective_rank(w)
                 norms.append(fro_norm.item())
                 ranks.append(eff_r.item())
-
+        
             # Append a row to the CSV file
             step = self.global_step
             row = [step]
