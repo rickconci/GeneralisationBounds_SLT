@@ -17,31 +17,8 @@ from lightning.pytorch.profilers import SimpleProfiler, AdvancedProfiler
 
 from data import DataModule
 from models import SparseDeepModel, ModularCNN
-from utils import none_or_float, simulate_model_dimensions, calculate_total_params, create_kernel_dict, max_pixel_sums
-from lightning.pytorch.callbacks import Callback
-
-class CustomEarlyStopping(Callback):
-    def __init__(self, target_accuracy=0.95, max_epochs=3000):
-        '''
-        Custom early stopping callback.
-        Args:
-            target_accuracy (float): Training will stop when this accuracy is reached.
-            max_epochs (int): Maximum number of epochs to train if target accuracy is not reached.
-        '''
-        self.target_accuracy = target_accuracy
-    def on_train_epoch_end(self, trainer, pl_module):
-        '''
-        Called at the end of each training epoch.
-        Args:
-            trainer: The Lightning Trainer.
-            pl_module: The LightningModule (your model).
-        '''
-        # Get the logged training accuracy
-        train_acc = trainer.callback_metrics.get('train_acc', None)
-        # Stop training if target accuracy is reached
-        if train_acc is not None and train_acc >= self.target_accuracy:
-            print(f'Training stopped early as training accuracy reached {train_acc:.4f}.')
-            trainer.should_stop = True
+from utils import none_or_float, simulate_model_dimensions, calculate_total_params, create_kernel_dict, max_pixel_sums, MetricsCallback, CustomEarlyStopping
+import plotting
 
 wandb.login(key = '3c5767e934e3aa77255fc6333617b6e0a2aab69f')
 
@@ -87,9 +64,8 @@ def main(args):
     filename_parts = [
         f"sd={args.seed}",
         f"dataset={args.dataset_name}",
-        f"model={args.model_name}",
         f"random_label_fraction={args.random_label_fraction}",
-        f"noise_image_fraction={args.noise_image_fraction}"
+        f"train_subset_fraction={args.train_subset_fraction}",
     ]
     unique_dir_name = "_".join(filename_parts)
 
@@ -102,6 +78,7 @@ def main(args):
                              noise_image_fraction = args.noise_image_fraction, 
                              train_subset_fraction = args.train_subset_fraction,
                              val_subset_fraction = args.val_subset_fraction)
+    data_module.setup()
 
     #define model
     kernel_dict = create_kernel_dict(args.kernel_sizes, args.out_channels, args.strides, args.paddings)
@@ -133,6 +110,11 @@ def main(args):
 
     
 
+    # Compute max pixel sums for bound computation
+    max_pixel_sum = max_pixel_sums(args.dataset_name)
+    print(f"Max Pixel Sums : {max_pixel_sum}")
+    model.max_pixel_sum = max_pixel_sum
+
     #define callbacks
     callbacks = []
 
@@ -158,49 +140,49 @@ def main(args):
         )
         callbacks.append(early_stopping)
 
-    #callbacks.append[DeviceStatsMonitor()]
-
-    # Call setup to initialize datasets
-    data_module.setup()
-
-    # Access the training dataset directly
-    train_dataset = data_module.train
-
-    # Compute max pixel sums one by one
-    max_pixel_sum = max_pixel_sums(train_dataset)
-    print(f"Max Pixel Sums (One by One): {max_pixel_sum}")
-
-    # Pass max_pixel_sum to the trainer (using LightningModule's `configure_optimizers`)
-    model.max_pixel_sum = max_pixel_sum
+    metrics_callback = MetricsCallback(unique_dir_name)
+    callbacks.append(metrics_callback)    
 
     # Define the custom early stopping callback
     early_stopping_callback = CustomEarlyStopping(target_accuracy=0.99)
+    callbacks.append(early_stopping_callback)
+
     
     trainer = Trainer(
         max_epochs=args.max_epochs,
         accelerator=args.accelerator,
         logger=wandb_logger,
         log_every_n_steps=5,
-        callbacks=callbacks + [early_stopping_callback],
+        callbacks=callbacks,
         #fast_dev_run = True,
         #overfit_batches = 1
         #deterministic=True,
         #check_val_every_n_epoch=1,
         devices=1,
         #strategy=“ddp”,
-        accumulate_grad_batches=6,
-        profiler='simple'   #this helps to identify bottlenecks
+        #accumulate_grad_batches=1,
+        #profiler='simple'   #this helps to identify bottlenecks
     )
     trainer.fit(model, data_module)
 
     trainer.test(model, ckpt_path='last', dataloaders = data_module.test_dataloader())
 
-
+    #plotting.plot_bound_vs_epochs(unique_dir_name)
+    #plotting.plot_bound_vs_train_subset_fraction(unique_dir_name)
+    #plotting.plot_layer_norms_vs_epochs(unique_dir_name)
+    #plotting.plot_bound_vs_hyperparams(unique_dir_name)
+    #plotting.plot_bound_vs_optimizer(unique_dir_name)
 
 if __name__ == '__main__':
     #sys.stdout = open('SLT_project_output.txt', 'w')
 
     parser = argparse.ArgumentParser(description="Train a model on CV dataset")
+
+    parser.add_argument('--project_name', type=str, default='SLT_experiments_1', help='Name of the wandb project')
+    parser.add_argument('--log_wandb', action='store_true', help='Enable logging to wandb')
+    parser.add_argument('--no_log_wandb', dest='log_wandb', action='store_false', help='Disable logging to wandb')
+    parser.set_defaults(log_wandb=True)
+
     # Experiment specific args 
     parser.add_argument('--dataset_name', type=str, default='MNIST', choices=['MNIST', 'CIFAR10', 'ImageNet'], help='Dataset to use')
     parser.add_argument('--train_subset_fraction', type=float, default=1.0, help='Size of the training subset to use')
@@ -235,25 +217,18 @@ if __name__ == '__main__':
     parser.add_argument('--no_use_warmup', dest='use_warmup', action='store_false', help='Disable lr warmup')
     parser.set_defaults(use_warmup=False)
     parser.add_argument('--lr_decay_type', type=str, default='multi_step', choices=['multi_step', 'cosine', 'linear'], help='Type of lr decay to use')    
-
-    
-    # Boolean arguments with proper handling
-    parser.add_argument('--accelerator', type=str, default='gpu', choices=['gpu', 'mps', 'cpu', 'auto'], help='Which accelerator to use')
-
-    parser.add_argument('--log_wandb', action='store_true', help='Enable logging to wandb')
-    parser.add_argument('--no_log_wandb', dest='log_wandb', action='store_false', help='Disable logging to wandb')
-    parser.set_defaults(log_wandb=True)
     
     parser.add_argument('--model_checkpoint', action='store_true', help='Enable model checkpointing')
     parser.add_argument('--no_model_checkpoint', dest='model_checkpoint', action='store_false', help='Disable model checkpointing')
     parser.set_defaults(model_checkpoint=False)
-
-    parser.add_argument('--seed', type=int, default=42, help='Seed for random number generators')
-    parser.add_argument('--project_name', type=str, default='SLT_experiments_1', help='Name of the wandb project')
     
     parser.add_argument('--early_stopping', action='store_true', help='Enable early stopping')
     parser.add_argument('--no_early_stopping', dest='early_stopping', action='store_false', help='Disable early stopping')
     parser.set_defaults(early_stopping=True)
+
+    parser.add_argument('--seed', type=int, default=42, help='Seed for random number generators')
+    parser.add_argument('--accelerator', type=str, default='gpu', choices=['gpu', 'mps', 'cpu', 'auto'], help='Which accelerator to use')
+
     
      
     args = parser.parse_args()

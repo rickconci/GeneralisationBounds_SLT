@@ -4,34 +4,104 @@ import math
 import numpy as np
 import torchvision
 import argparse
+import os
+import pandas as pd
+from lightning.pytorch.callbacks import Callback
 
-# def max_pixel_sums(data_loader):
-#     """
-#     Compute the maximum pixel sum for squared images in the dataset.
-#     """
-#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
-    
-#     # Get image size from the first batch
-#     first_batch = next(iter(data_loader))
-#     images, _ = first_batch
-#     image_size = images[0].size()
+class MetricsCallback(Callback):
+    def __init__(self, experiment_name, save_dir='experiment_data'):
+        super().__init__()
+        self.save_dir = save_dir
+        self.experiment_name = experiment_name
+        self.metrics_data = {
+            'bound_data': [],
+            'layer_norms': [],
+            'hyperparameter_bounds': []  # New list for hyperparameter-specific bound data
+        }
+        os.makedirs(save_dir, exist_ok=True)
 
-#     # Initialize a tensor to hold the pixel sums
-#     pixel_sums = torch.zeros(image_size, device=device)
+    def on_train_epoch_end(self, trainer, pl_module):
+        # Collect data every epoch
+        epoch = trainer.current_epoch
+        
+        # Get experiment parameters
+        random_label_fraction = trainer.datamodule.random_label_fraction
+        train_subset_fraction = trainer.datamodule.train_subset_fraction
+        
+        # Get additional hyperparameters
+        weight_decay = pl_module.hparams.weight_decay
+        batch_size = trainer.datamodule.batch_size
+        optimizer_type = pl_module.hparams.optimizer_choice
+        
+        # Get bound data
+        bound = trainer.callback_metrics.get('generalization_bound', None)
+        if bound is not None:
+            # Existing bound data collection
+            self.metrics_data['bound_data'].append({
+                'epoch': epoch,
+                'random_label_fraction': random_label_fraction,
+                'train_subset_fraction': train_subset_fraction,
+                'bound': bound.item()
+            })
+            
+            # New hyperparameter-specific bound data collection
+            self.metrics_data['hyperparameter_bounds'].append({
+                'epoch': epoch,
+                'weight_decay': weight_decay,
+                'batch_size': batch_size,
+                'optimizer_type': optimizer_type,
+                'bound': bound.item()
+            })
 
-#     # Loop over all images in the dataset and accumulate pixel sums
-#     for images, _ in data_loader:
-#         images = images.to(device)
-#         pixel_sums += torch.sum(torch.pow(images, 2), dim=0)
-    
-#     #print(f"Pixel sums device: {pixel_sums.device}")
-#     #print(f"Images device: {images.device}")
+        # Get layer norms
+        for idx, layer in enumerate(pl_module.weight_layers):
+            norm = torch.norm(layer.weight, p='fro').item()
+            self.metrics_data['layer_norms'].append({
+                'epoch': epoch,
+                'layer_idx': idx,
+                'random_label_fraction': random_label_fraction,
+                'train_subset_fraction': train_subset_fraction,
+                'norm': norm
+            })
 
-#     # Return the max value of pixel sums
-#     return pixel_sums.max().item()
+    def on_train_end(self, trainer, pl_module):
+        # Save collected data to pickle files
+        bound_df = pd.DataFrame(self.metrics_data['bound_data'])
+        norms_df = pd.DataFrame(self.metrics_data['layer_norms'])
+        hyperparameter_bounds_df = pd.DataFrame(self.metrics_data['hyperparameter_bounds'])
+        
+        # Save DataFrames
+        bound_df.to_pickle(os.path.join(self.save_dir, f'{self.experiment_name}_bounds.pkl'))
+        norms_df.to_pickle(os.path.join(self.save_dir, f'{self.experiment_name}_norms.pkl'))
+        hyperparameter_bounds_df.to_pickle(os.path.join(self.save_dir, f'{self.experiment_name}_hyperparameter_bounds.pkl'))
 
-def max_pixel_sums(dataset):
+
+class CustomEarlyStopping(Callback):
+    def __init__(self, target_accuracy=0.95, max_epochs=3000):
+        '''
+        Custom early stopping callback.
+        Args:
+            target_accuracy (float): Training will stop when this accuracy is reached.
+            max_epochs (int): Maximum number of epochs to train if target accuracy is not reached.
+        '''
+        self.target_accuracy = target_accuracy
+    def on_train_epoch_end(self, trainer, pl_module):
+        '''
+        Called at the end of each training epoch.
+        Args:
+            trainer: The Lightning Trainer.
+            pl_module: The LightningModule (your model).
+        '''
+        # Get the logged training accuracy
+        train_acc = trainer.callback_metrics.get('train_acc', None)
+        # Stop training if target accuracy is reached
+        if train_acc is not None and train_acc >= self.target_accuracy:
+            print(f'Training stopped early as training accuracy reached {train_acc:.4f}.')
+            trainer.should_stop = True
+
+
+
+def max_pixel_sums(dataset_name):
     """
     Compute the maximum pixel sum for squared images in the dataset by iterating over each image.
 
@@ -43,28 +113,27 @@ def max_pixel_sums(dataset):
     """
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
-    # Check if the dataset is a Subset
-    if isinstance(dataset, torch.utils.data.Subset):
-        indices = dataset.indices
-        dataset = dataset.dataset  # Access the underlying dataset
+    if dataset_name == "MNIST":
+        dataset = torchvision.datasets.MNIST(root='./data', train=True, download=True)
     else:
-        indices = range(len(dataset))  # All indices for non-Subset datasets
-
-    # Get the size of the first image
-    image, _ = dataset[indices[0]]
-    image_size = image.size()
+        raise ValueError(f"Unsupported dataset: {dataset_name}")
+    
+    image, _ = dataset[0]
+    image_tensor = torchvision.transforms.functional.to_tensor(image)
+    image_size = image_tensor.size()
 
     # Initialize a tensor to hold the pixel sums
     pixel_sums = torch.zeros(image_size, device=device)
 
-    # Loop through all images in the dataset and compute squared pixel sums
+    # Loop over all images in the dataset and add their pixels to the sums
     for i in range(len(dataset)):
-        image, _ = dataset[i]  # No need to transform; already a tensor
-        pixel_sums += torch.pow(image, 2)
+        image, _ = dataset[i]
+        image_tensor = torchvision.transforms.functional.to_tensor(image)
+        pixel_sums += torch.pow(image_tensor, 2)
 
-    # Return the maximum value from the summed pixel tensor
+    # Return the tensor of pixel sums
     return pixel_sums.max().item()
+
 
 def eval_rho(net):
     """
@@ -76,28 +145,6 @@ def eval_rho(net):
             rho *= torch.norm(layer.weight.data, p='fro').item()
     return rho
 
-# def our_total_bound(net, data_loader, num_classes, dataset_size, depth, delta=0.001):
-#     """
-#     Compute the generalization bound for the given model and return intermediate values.
-#     """
-#     rho = eval_rho(net)
-#     n = dataset_size
-#     k = num_classes
-#     max_deg = 2  # Assuming ReLU activations (degree 2)
-#     deg_prod = max_deg ** depth  # Approximation for product of degrees
-
-#     # Multiplier terms
-#     mult1 = (rho + 1) / n
-#     mult2 = 2 ** 1.5 * (1 + math.sqrt(2 * (depth * np.log(2 * max_deg) + np.log(k))))
-#     max_sum_sqrt = math.sqrt(max_pixel_sums(data_loader))
-#     mult3 = max_sum_sqrt * math.sqrt(deg_prod)
-
-#     # Additional term
-#     add1 = 3 * math.sqrt(np.log((2 * (rho + 2) ** 2) / delta) / (2 * n))
-
-#     # Final bound
-#     bound = mult1 * mult2 * mult3 + add1
-#     return bound, mult1, mult2, mult3, add1
 
 def our_total_bound(net, num_classes, dataset_size, depth, kernel_dict, max_pixel_sum, delta=0.001):
     """
