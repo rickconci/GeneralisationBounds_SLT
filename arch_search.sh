@@ -18,7 +18,7 @@ architectures=(
 )
 
 # Define parameter arrays
-lr=(0.010.001)
+lr=(0.01 0.001)
 batch_size=(128 512 1248)
 random_label_fraction=("None" 1)
 optimizer_choice=('SGD' 'AdamW')
