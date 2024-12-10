@@ -288,6 +288,20 @@ class ModularCNN(LightningModule):
         #self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
         self.log("train_acc", self.train_acc, on_step=True, on_epoch=True, prog_bar=True)
 
+        data_loader = self.trainer.datamodule.train_dataloader()
+        num_classes = self.hparams.num_classes
+        dataset_size = len(data_loader.dataset)
+        depth = len([layer for layer in self.model.modules() if isinstance(layer, (torch.nn.Conv2d, torch.nn.Linear))])
+
+        # Compute the generalization bound using the utility function
+        bound, mult1, mult2, mult3, add1 = our_total_bound(self, num_classes, dataset_size, depth, self.kernel_dict, self.max_pixel_sum)
+
+        self.log("generalization_bound", bound, on_epoch=False, on_step=True, prog_bar=False)
+        self.log("bound_components/mult1", mult1, on_epoch=False, on_step=True, prog_bar=False)
+        self.log("bound_components/mult2", mult2, on_epoch=False, on_step=True, prog_bar=False)
+        self.log("bound_components/mult3", mult3, on_epoch=False, on_step=True, prog_bar=False)
+        self.log("bound_components/add1", add1, on_epoch=False, on_step=True, prog_bar=False)
+
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -413,24 +427,6 @@ class ModularCNN(LightningModule):
     def on_train_epoch_end(self):
         # Ensure self.trainer and self.hparams are accessible
         if self.trainer.datamodule and self.hparams:
-            # Access the training dataloader
-            data_loader = self.trainer.datamodule.train_dataloader()
-            num_classes = self.hparams.num_classes
-            dataset_size = len(data_loader.dataset)
-            depth = len([layer for layer in self.model.modules() if isinstance(layer, (torch.nn.Conv2d, torch.nn.Linear))])
-    
-            # Compute the generalization bound using the utility function
-            bound, mult1, mult2, mult3, add1 = our_total_bound(self, num_classes, dataset_size, depth, self.kernel_dict, self.max_pixel_sum)
-    
-            # Log the bound as before
-            self.log("generalization_bound", bound, on_epoch=True, on_step=False, prog_bar=True)
-    
-            # Log the intermediate values to a "folder" named "bound_components" in W&B
-            self.log("bound_components/mult1", mult1, on_epoch=True, on_step=False, prog_bar=False)
-            self.log("bound_components/mult2", mult2, on_epoch=True, on_step=False, prog_bar=False)
-            self.log("bound_components/mult3", mult3, on_epoch=True, on_step=False, prog_bar=False)
-            self.log("bound_components/add1", add1, on_epoch=True, on_step=False, prog_bar=False)
-        
             if self.current_epoch % 5 == 0:
                 # Iterate over all Conv2d/Linear layers and log their Frobenius norms and ranks
                 layer_idx = 0
@@ -447,8 +443,8 @@ class ModularCNN(LightningModule):
                         # Log these values
                         # Using a consistent naming scheme groups them in W&B:
                         # "weight_fro_norm/layer_0", "weight_fro_norm/layer_1", etc.
-                        self.log(f"weight_fro_norm/layer_{layer_idx}", fro_norm, on_step=True, on_epoch=False)
-                        self.log(f"weight_ranks/layer_{layer_idx}", rank, on_step=True, on_epoch=False)
+                        self.log(f"weight_fro_norm/layer_{layer_idx}", fro_norm, on_step=False, on_epoch=True)
+                        self.log(f"weight_ranks/layer_{layer_idx}", rank, on_step=False, on_epoch=True)
                         layer_idx += 1
         '''
 

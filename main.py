@@ -134,18 +134,18 @@ def main(args):
         early_stopping = EarlyStopping(
             min_delta=0.00,
             monitor='train_acc',
-            patience=50,
+            patience=150,
             mode='max',
             verbose=True
         )
         callbacks.append(early_stopping)
+        
+        early_stopping_callback = CustomEarlyStopping(target_accuracy=0.99)
+        callbacks.append(early_stopping_callback)
 
     metrics_callback = MetricsCallback(unique_dir_name)
     callbacks.append(metrics_callback)    
 
-    # Define the custom early stopping callback
-    early_stopping_callback = CustomEarlyStopping(target_accuracy=0.99)
-    callbacks.append(early_stopping_callback)
 
     
     trainer = Trainer(
@@ -212,7 +212,7 @@ if __name__ == '__main__':
     parser.add_argument('--optimizer_choice', type=str, default='SGD', choices=['SGD', 'AdamW'], help='Optimizer to use')
     parser.add_argument('--weight_decay', type=float, default=8e-4, help='Weight decay')
 
-    parser.add_argument('--momentum', type=float, default=0.0, help='Momentum')
+    parser.add_argument('--momentum', type=float, default=0.9, help='Momentum')
     parser.add_argument('--use_warmup', action='store_true', help='Enable lr warmup')
     parser.add_argument('--no_use_warmup', dest='use_warmup', action='store_false', help='Disable lr warmup')
     parser.set_defaults(use_warmup=False)

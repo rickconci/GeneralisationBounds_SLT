@@ -5,24 +5,17 @@ SCRIPT_PATH="main.py"
 
 # Define architectures
 architectures=(
-    "2 2 2|1 1 1|0 0 0|600 600 600"
-     "2 2 2|1 1 1|0 0 0|512 512 512"
-     "2 2 2|1 2 1|0 0 0|512 1024 512"
+    "2 2 2|1 1 1|0 0 0|200 200 200"
+#    "2 2 2|1 1 1|0 0 0|600 600 600"
 )
-# architectures=(
-#     "3 2 2|1 1 2|0 0 1|128 256 512"
-#     "3 2 2|1 2 2|0 0 0|128 256 512"
-#     "2 3 3|1 1 2|0 0 1|128 256 512"
-#     "3 3 3|1 2 2|0 1 1|128 256 512"
-#     "3 2 2 2|1 1 2 1|0 0 1 0|128 128 256 512"
-#     "3 2 2|2 2 2|0 0 0|128 256 512"
-# )
 
 # Define parameter arrays
-lr=(0.01 0.001)
-batch_size=(32 64 128 256 512 1024)
-random_label_fraction=("None" 1)
-optimizer_choice=('SGD' 'AdamW')
+lr=(0.01) # 0.001)
+batch_size=(32) #128 512)
+random_label_fraction=('None' 1) # 1) #"None")
+optimizer_choice=('SGD') #'AdamW')
+weight_decay=(0.0001) #(0.0005 0.001)  #(0.0 3e-3)
+use_warmup=("" "")
 
 # Automatically detect available GPUs
 gpus=($(nvidia-smi --query-gpu=index --format=csv,noheader))
@@ -44,12 +37,17 @@ combinations=()
 for random_label_fraction in "${random_label_fraction[@]}"; do
     for lr_value in "${lr[@]}"; do
         for batch_size_value in "${batch_size[@]}"; do
-            for architecture in "${architectures[@]}"; do
-                for optimizer in "${optimizer_choice[@]}"; do
-                    # Extract architecture components
-                    IFS='|' read -r kernel_sizes strides paddings out_channels <<< "$architecture"
-                    # Store combination as a single string with a unique delimiter
-                    combinations+=("$random_label_fraction|$lr_value|$batch_size_value|$kernel_sizes|$strides|$paddings|$out_channels|$optimizer")
+            for weight_decay_value in "${weight_decay[@]}"; do
+                for use_warmup_flag in "${use_warmup[@]}"; do
+                    for architecture in "${architectures[@]}"; do
+                        for optimizer in "${optimizer_choice[@]}"; do
+                            # Extract architecture components
+                            IFS='|' read -r kernel_sizes strides paddings out_channels <<< "$architecture"
+                            # Store combination as a single string with a unique delimiter
+                            # Including use_warmup_flag and weight_decay
+                            combinations+=("$random_label_fraction|$lr_value|$batch_size_value|$weight_decay_value|$use_warmup_flag|$kernel_sizes|$strides|$paddings|$out_channels|$optimizer")
+                        done
+                    done
                 done
             done
         done
@@ -60,7 +58,7 @@ num_combinations=${#combinations[@]}
 echo "Number of combinations: $num_combinations"
 
 # Define the number of slots per GPU
-slots_per_gpu=1  # Adjust this value as needed
+slots_per_gpu=2  # Adjust this value as needed
 
 # Initialize an associative array to keep track of PIDs per GPU
 declare -A gpu_pids
@@ -104,31 +102,33 @@ for ((i = 0; i < num_combinations; i++)); do
     done
 
     # Get hyperparameters
-    IFS='|' read -r random_label_fraction lr batch_size kernel_sizes strides paddings out_channels optimizer <<< "${combinations[$i]}"
+    IFS='|' read -r random_label_fraction lr batch_size weight_decay_val use_warmup_flag kernel_sizes strides paddings out_channels optimizer <<< "${combinations[$i]}"
 
     # Determine early_stopping_flag and max_epochs based on random_label_fraction
     if [ "$random_label_fraction" == "None" ]; then
-        early_stopping_flag="--early_stopping"
-        max_epochs=800
+        early_stopping_flag="--no_early_stopping"
+        max_epochs=1000
     else
         early_stopping_flag="--early_stopping"
-        max_epochs=800
+        max_epochs=1000
     fi
 
     # Log file name
     log_file="logs/gpu_${assigned_gpu}_run_${i}.log"
 
     # Run the Python script on the assigned GPU
-    echo "GPU $assigned_gpu: Starting run $i with lr=$lr, batch_size=$batch_size, random_label_fraction=$random_label_fraction, early_stopping_flag=$early_stopping_flag, max_epochs=$max_epochs"
+    echo "GPU $assigned_gpu: Starting run $i with lr=$lr, batch_size=$batch_size, weight_decay=$weight_decay_val, random_label_fraction=$random_label_fraction, early_stopping_flag=$early_stopping_flag, max_epochs=$max_epochs, use_warmup_flag=$use_warmup_flag"
     echo "Architecture: kernel_sizes=$kernel_sizes, strides=$strides, paddings=$paddings, out_channels=$out_channels"
     echo "Optimizer: $optimizer"
-    (
+    (  
         CUDA_VISIBLE_DEVICES=$assigned_gpu python $SCRIPT_PATH \
             --lr $lr \
             --batch_size $batch_size \
+            --weight_decay $weight_decay_val \
             --random_label_fraction $random_label_fraction \
             $early_stopping_flag \
             --max_epochs $max_epochs \
+            $use_warmup_flag \
             --kernel_sizes $kernel_sizes \
             --strides $strides \
             --paddings $paddings \
