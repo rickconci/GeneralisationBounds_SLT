@@ -1,6 +1,22 @@
 # GeneralisationBounds_SLT
 
-## environment
+### Abstract
+
+Recent advancements in statistical learning theory have introduced tighter general-
+ization bounds for deep neural networks with compositional sparsity, challenging
+the long-held critique of traditional complexity measures. In this work, we re-
+visit the relationship between theoretical bounds and empirical performance in
+the context of convolutional neural networks (CNNs). We empirically evaluate
+tighter generalization bounds focusing on networks trained with varying degree
+of randomness showing that, while still vacous, they entail great information
+about the generalization performance of the network. We also investigate how the
+bound changes with scaled data sizes, indicating with extended data, a non-vacous
+bound could be achieved. Lastly, we offer insight to how regularization strategies
+and hyperparameters can be used in future work to generate tight bounds. Our
+findings underscore the potential of architecture-specific norm-based bounds in
+generalization capabilities of CNNs
+
+### Setup
 
 **Download and install Miniconda**
 `curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh`
@@ -8,11 +24,9 @@
 `source ~/.bashrc`
 `conda config --set auto_activate_base false`
 
-**Clone the repository**
-`git clone https://github.com/rickconci/GeneralisationBounds_SLT.git`
-`cd GeneralisationBounds_SLT`
-`git switch GPU-testing`
-`sh setup.sh`
+**Environment setup**
+`conda env create -f env2.yaml`
+`conda activate SLT`
 
 **env composed of:**
 `conda create -n SLT python=3.10`
@@ -31,8 +45,8 @@
 **Run it with the following command:**
 `python3 main.py`
 
---
+**Parallel GPU Experiments**
+`sh_folder/arch_search.sh`
+`sh_folder/SLT_experiment3.sh`
 
-Questions:
-
-- code says multi_step gamma is 0.2, but in the readme it is 0.1.
+Plotting code not included in the repository.
