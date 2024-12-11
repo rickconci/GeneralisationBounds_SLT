@@ -7,6 +7,7 @@ import argparse
 import os
 import pandas as pd
 from lightning.pytorch.callbacks import Callback
+from torch.utils.data import DataLoader, Subset  
 
 class MetricsCallback(Callback):
     def __init__(self, experiment_name, save_dir='experiment_data'):
@@ -101,7 +102,7 @@ class CustomEarlyStopping(Callback):
 
 
 
-def max_pixel_sums(dataset_name):
+def max_pixel_sums(dataset_name, random_subset_training_indices):
     """
     Compute the maximum pixel sum for squared images in the dataset by iterating over each image.
 
@@ -119,6 +120,12 @@ def max_pixel_sums(dataset_name):
     else:
         raise ValueError(f"Unsupported dataset: {dataset_name}")
     
+    #in case the dataset is a subset, use the indices to get the exact subset indices to calcualte the max pixel sum
+    print(f"Dataset size before subsetting: {len(dataset)}")
+    print(f"Length of subset training indices: {len(random_subset_training_indices)}")
+    dataset = Subset(dataset, random_subset_training_indices) 
+    print(f"Dataset size after subsetting: {len(dataset)}")
+
     # Get the size of a single image
     image, _ = dataset[0]
     image_tensor = torchvision.transforms.functional.to_tensor(image)
@@ -135,6 +142,7 @@ def max_pixel_sums(dataset_name):
 
     # Return the maximum pixel sum
     return pixel_sums.max().item()
+
 
 def eval_rho(net):
     """

@@ -12,10 +12,12 @@ architectures=(
 # Define parameter arrays
 lr=(0.01) # 0.001)
 batch_size=(32) #128 512)
-random_label_fraction=('None' 1) # 1) #"None")
+random_label_fraction=('None' 0.5 1) # 1) #"None")
 optimizer_choice=('SGD') #'AdamW')
 weight_decay=(0.0001) #(0.0005 0.001)  #(0.0 3e-3)
-use_warmup=("" "")
+use_warmup=("")
+train_subset_fractions=(0.1 0.25 0.5 0.75 1)
+
 
 # Automatically detect available GPUs
 gpus=($(nvidia-smi --query-gpu=index --format=csv,noheader))
@@ -41,11 +43,13 @@ for random_label_fraction in "${random_label_fraction[@]}"; do
                 for use_warmup_flag in "${use_warmup[@]}"; do
                     for architecture in "${architectures[@]}"; do
                         for optimizer in "${optimizer_choice[@]}"; do
-                            # Extract architecture components
-                            IFS='|' read -r kernel_sizes strides paddings out_channels <<< "$architecture"
-                            # Store combination as a single string with a unique delimiter
-                            # Including use_warmup_flag and weight_decay
-                            combinations+=("$random_label_fraction|$lr_value|$batch_size_value|$weight_decay_value|$use_warmup_flag|$kernel_sizes|$strides|$paddings|$out_channels|$optimizer")
+                            for train_subset_fraction in "${train_subset_fractions[@]}"; do
+                                # Extract architecture components
+                                IFS='|' read -r kernel_sizes strides paddings out_channels <<< "$architecture"
+                                # Store combination as a single string with a unique delimiter
+                                # Including use_warmup_flag and weight_decay
+                                combinations+=("$random_label_fraction|$lr_value|$batch_size_value|$weight_decay_value|$use_warmup_flag|$kernel_sizes|$strides|$paddings|$out_channels|$optimizer|$train_subset_fraction")
+                            done 
                         done
                     done
                 done
@@ -102,22 +106,22 @@ for ((i = 0; i < num_combinations; i++)); do
     done
 
     # Get hyperparameters
-    IFS='|' read -r random_label_fraction lr batch_size weight_decay_val use_warmup_flag kernel_sizes strides paddings out_channels optimizer <<< "${combinations[$i]}"
+    IFS='|' read -r random_label_fraction lr batch_size weight_decay_val use_warmup_flag kernel_sizes strides paddings out_channels optimizer train_subset_fractions<<< "${combinations[$i]}"
 
     # Determine early_stopping_flag and max_epochs based on random_label_fraction
     if [ "$random_label_fraction" == "None" ]; then
         early_stopping_flag="--no_early_stopping"
-        max_epochs=1000
+        max_epochs=200
     else
-        early_stopping_flag="--early_stopping"
-        max_epochs=1000
+        early_stopping_flag="--no_early_stopping"
+        max_epochs=200
     fi
 
     # Log file name
     log_file="logs/gpu_${assigned_gpu}_run_${i}.log"
 
     # Run the Python script on the assigned GPU
-    echo "GPU $assigned_gpu: Starting run $i with lr=$lr, batch_size=$batch_size, weight_decay=$weight_decay_val, random_label_fraction=$random_label_fraction, early_stopping_flag=$early_stopping_flag, max_epochs=$max_epochs, use_warmup_flag=$use_warmup_flag"
+    echo "GPU $assigned_gpu: Starting run $i with lr=$lr, batch_size=$batch_size, weight_decay=$weight_decay_val, random_label_fraction=$random_label_fraction, early_stopping_flag=$early_stopping_flag, max_epochs=$max_epochs, use_warmup_flag=$use_warmup_flag, train_subset_fraction=$train_subset_fraction"
     echo "Architecture: kernel_sizes=$kernel_sizes, strides=$strides, paddings=$paddings, out_channels=$out_channels"
     echo "Optimizer: $optimizer"
     (  
@@ -133,7 +137,8 @@ for ((i = 0; i < num_combinations; i++)); do
             --strides $strides \
             --paddings $paddings \
             --out_channels $out_channels \
-            --optimizer_choice $optimizer > $log_file 2>&1
+            --optimizer_choice $optimizer \
+            --train_subset_fraction $train_subset_fraction > $log_file 2>&1
     ) &
 
     pid=$!

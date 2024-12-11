@@ -98,18 +98,23 @@ class DataModule(L.LightningDataModule):
             # Load MNIST dataset
             self.train = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=self.transform)
             self.val_test = torchvision.datasets.MNIST(root='./data', train=False, download=True, transform=self.transform)
-            
+            print(f"Original training dataset size: {len(self.train)}")
+
             # Split the validation set into validation and test sets by 90% and 10% respectively    
             self.val = Subset(self.val_test, range(0, int(0.9 * len(self.val_test))))
             self.test = Subset(self.val_test, range(int(0.9 * len(self.val_test)), len(self.val_test)))
     
             # Create a smaller subset of the training dataset if specified
-            if self.train_subset_fraction is not None:
-                indices = np.random.choice(len(self.train), int(self.train_subset_fraction * len(self.train)), replace=False)  # Random subset
-                self.train = Subset(self.train, indices) 
+            if self.train_subset_fraction != 1.0:
+                self.random_subset_training_indices = np.random.choice(len(self.train), int(self.train_subset_fraction * len(self.train)), replace=False)  # Random subset
+                self.train = Subset(self.train, self.random_subset_training_indices) 
+                print(f"Training dataset size after subsetting: {len(self.train)}")
+
+            else:
+                self.random_subset_training_indices = range(len(self.train))
     
             # Create a smaller subset of the validation dataset if specified
-            if self.val_subset_fraction is not None:
+            if self.val_subset_fraction != 1.0:
                 val_indices = np.random.choice(len(self.val), int(self.val_subset_fraction * len(self.val)), replace=False)  # Random subset
                 self.val = Subset(self.val, val_indices)
             
@@ -149,7 +154,7 @@ class DataModule(L.LightningDataModule):
                 self.randomize_labels()
 
             if self.noise_image_fraction is not None:
-                self.noisy_images()
+                self.noisy_images() 
 
     def randomize_labels(self):
         """Randomize a percentage of labels in the training dataset based on random_label_fraction"""

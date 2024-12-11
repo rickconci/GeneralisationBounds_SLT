@@ -111,7 +111,7 @@ def main(args):
     
 
     # Compute max pixel sums for bound computation
-    max_pixel_sum = max_pixel_sums(args.dataset_name)
+    max_pixel_sum = max_pixel_sums(args.dataset_name, data_module.random_subset_training_indices)
     print(f"Max Pixel Sums : {max_pixel_sum}")
     model.max_pixel_sum = max_pixel_sum
 
@@ -213,8 +213,7 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', type=float, default=8e-4, help='Weight decay')
 
     parser.add_argument('--momentum', type=float, default=0.9, help='Momentum')
-    parser.add_argument('--use_warmup', action='store_true', help='Enable lr warmup')
-    parser.add_argument('--no_use_warmup', dest='use_warmup', action='store_false', help='Disable lr warmup')
+    parser.add_argument('--use_warmup', dest='use_warmup', action='store_true', help='Enable lr warmup')
     parser.set_defaults(use_warmup=False)
     parser.add_argument('--lr_decay_type', type=str, default='multi_step', choices=['multi_step', 'cosine', 'linear'], help='Type of lr decay to use')    
     

@@ -24,7 +24,7 @@ git switch GPU-testing
 
 # Set up the Conda environment
 echo "Creating and activating the Conda environment..."
-conda env create -f env.yaml
+conda env create -f env2.yaml
 conda activate SLT
 
 echo "Environment setup complete. You are now in the GPU-testing branch and the SLT environment is activated."
