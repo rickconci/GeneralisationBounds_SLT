@@ -18,7 +18,6 @@ from lightning.pytorch.profilers import SimpleProfiler, AdvancedProfiler
 from data import DataModule
 from models import SparseDeepModel, ModularCNN
 from utils import none_or_float, simulate_model_dimensions, calculate_total_params, create_kernel_dict, max_pixel_sums, MetricsCallback, CustomEarlyStopping
-import plotting
 
 wandb.login(key = '3c5767e934e3aa77255fc6333617b6e0a2aab69f')
 
